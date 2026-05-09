@@ -2,7 +2,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
    Name = "Zaylinho Merchant Pro 2026",
-   LoadingTitle = "Menyiapkan Sistem Penjualan...",
+   LoadingTitle = "Mengintegrasikan Data SimpleSpy...",
    LoadingSubtitle = "by Zaylinho",
    ConfigurationSaving = { Enabled = false },
 })
@@ -23,10 +23,8 @@ local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 local function setupDetection()
     player.PlayerGui.DescendantAdded:Connect(function(obj)
         if obj:IsA("TextLabel") or obj:IsA("TextBox") then
-            -- Deteksi notifikasi "already have a booth" sesuai data gambar sebelumnya
             if string.find(string.lower(obj.Text), "already have a booth") then
                 _G.StopClaiming = true
-                Rayfield:Notify({Title = "Sistem", Content = "Booth sudah didapat! Berhenti spam.", Duration = 5})
             end
         end
     end)
@@ -56,7 +54,7 @@ local function startClaimLoop()
 end
 
 TabClaim:CreateToggle({
-   Name = "Auto Claim Booth (Anti-Spam)",
+   Name = "Auto Claim Booth",
    CurrentValue = true,
    Callback = function(Value)
       _G.AutoClaim = Value
@@ -68,7 +66,7 @@ setupDetection()
 startClaimLoop()
 
 -- ==========================================
--- TAB 2: AUTO MERCHANT (FIXED SEARCH & MULTI-SELECT)
+-- TAB 2: AUTO MERCHANT (FIXED BY SIMPLESPY)
 -- ==========================================
 local TabMerchant = Window:CreateTab("Auto Merchant", 4483362458)
 
@@ -78,68 +76,54 @@ local antreanCounter = 0
 local isSelling = false
 
 TabMerchant:CreateButton({
-   Name = "🔄 1. Refresh Isi Inventory",
+   Name = "🔄 1. Refresh Inventory",
    Callback = function()
       local temp = {}
       local backpack = player:FindFirstChild("Backpack")
       if backpack then
          for _, item in pairs(backpack:GetChildren()) do
-            -- Mengambil nama unik (termasuk tag Brontosaurus [KG] dll)
             if not table.find(temp, item.Name) then
                table.insert(temp, item.Name)
             end
          end
       end
-      
-      if #temp == 0 then table.insert(temp, "Inventory Kosong") end
       listBawaan = temp
-      
-      -- Update semua dropdown yang sudah dibuat agar muncul di pencarian
       for _, slot in pairs(antreanSlots) do
-         if slot.Dropdown then
-            slot.Dropdown:Refresh(listBawaan, {})
-         end
+         if slot.Dropdown then slot.Dropdown:Refresh(listBawaan, {}) end
       end
-      Rayfield:Notify({Title = "Sistem", Content = "Inventory diperbarui!", Duration = 3})
+      Rayfield:Notify({Title = "Sistem", Content = "Inventory Terbaca!", Duration = 3})
    end,
 })
 
 TabMerchant:CreateButton({
-   Name = "➕ 2. Tambah Menu Antrean",
+   Name = "➕ 2. Tambah Antrean Baru",
    Callback = function()
       antreanCounter = antreanCounter + 1
-      local slotData = { Items = {}, Price = 5, Delay = 5 }
+      local slotData = { Items = {}, Price = 2, Delay = 5 }
       
-      TabMerchant:CreateSection("=== Urutan Antrean #" .. antreanCounter .. " ===")
+      TabMerchant:CreateSection("Urutan Antrean #" .. antreanCounter)
       
-      -- Penambahan parameter yang benar agar Search berfungsi di Rayfield
       local dd = TabMerchant:CreateDropdown({
-         Name = "Pilih Item (Search Aktif)",
+         Name = "Pilih Item (Search & Multi)",
          Options = listBawaan,
          CurrentOption = {},
          MultipleOptions = true,
-         Flag = "SearchDD_" .. antreanCounter, -- Flag unik sangat penting
-         Callback = function(Options)
-            slotData.Items = Options
-         end,
+         Flag = "Slot_" .. antreanCounter,
+         Callback = function(Options) slotData.Items = Options end,
       })
       
       TabMerchant:CreateInput({
          Name = "Harga Token",
-         PlaceholderText = "5",
+         PlaceholderText = "Default: 2",
          NumbersOnly = true,
-         Callback = function(Text)
-            slotData.Price = tonumber(Text) or 5
-         end,
+         Callback = function(Text) slotData.Price = tonumber(Text) or 2 end,
       })
       
       TabMerchant:CreateInput({
-         Name = "Delay Jual (Detik)",
-         PlaceholderText = "5",
+         Name = "Jeda Jual (Detik)",
+         PlaceholderText = "Default: 5",
          NumbersOnly = true,
-         Callback = function(Text)
-            slotData.Delay = tonumber(Text) or 5
-         end,
+         Callback = function(Text) slotData.Delay = tonumber(Text) or 5 end,
       })
       
       slotData.Dropdown = dd
@@ -147,41 +131,46 @@ TabMerchant:CreateButton({
    end,
 })
 
--- LOGIKA PENJUALAN DENGAN CROSS-CHECK KETAT
-local function mulaiJualan()
+local function jalankanProsesJual()
     task.spawn(function()
         while isSelling do
-            local backpack = player:FindFirstChild("Backpack")
-            if not backpack then task.wait(1) continue end
-            
-            for i, slot in ipairs(antreanSlots) do
+            for _, slot in ipairs(antreanSlots) do
                 if not isSelling then break end
-                if #slot.Items == 0 then continue end
                 
                 for _, itemName in ipairs(slot.Items) do
                     if not isSelling then break end
                     
-                    -- Cari item fisik secara real-time
-                    for _, item in pairs(backpack:GetChildren()) do
-                        if not isSelling then break end
-                        if item.Name == itemName then
-                            local itemID = item:GetAttribute("c")
+                    local backpack = player:FindFirstChild("Backpack")
+                    if not backpack then break end
+                    
+                    for _, itemObj in pairs(backpack:GetChildren()) do
+                        if itemObj.Name == itemName and isSelling then
+                            -- MENGAMBIL ID UUID SESUAI SIMPLESPY (Contoh: {0918d8ef...})
+                            local itemID = itemObj:GetAttribute("c") or itemObj:GetAttribute("ID")
+                            
                             if itemID then
-                                local success = false
-                                -- Loop sampai item benar-benar terdaftar di booth
-                                while not success and isSelling do
+                                local terpasang = false
+                                
+                                while not terpasang and isSelling do
                                     pcall(function()
-                                        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(itemID), slot.Price)
+                                        -- FORMAT BARU SESUAI LOG SIMPLESPY
+                                        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer(
+                                            "Pet", 
+                                            tostring(itemID), 
+                                            tonumber(slot.Price)
+                                        )
                                     end)
                                     
-                                    task.wait(2) -- Memberikan waktu server memproses
+                                    task.wait(2) -- Memberi waktu server memproses
                                     
-                                    -- Cek apakah item masih ada di backpack
-                                    if not item.Parent or item.Parent ~= player.Backpack then
-                                        success = true
+                                    -- Cross-check fisik
+                                    if not itemObj.Parent or itemObj.Parent ~= player.Backpack then
+                                        terpasang = true
+                                        Rayfield:Notify({Title = "Sukses", Content = itemName .. " Terpasang!", Duration = 2})
                                     end
                                 end
-                                if success then task.wait(slot.Delay) end
+                                
+                                if terpasang then task.wait(slot.Delay) end
                             end
                         end
                     end
@@ -197,7 +186,7 @@ TabMerchant:CreateToggle({
    CurrentValue = false,
    Callback = function(Value)
       isSelling = Value
-      if Value then mulaiJualan() end
+      if Value then jalankanProsesJual() end
    end,
 })
 
@@ -206,12 +195,6 @@ TabMerchant:CreateToggle({
 -- ==========================================
 local TabTeleport = Window:CreateTab("Teleport", 4483362458)
 TabTeleport:CreateButton({Name = "TRAVEL TO TRADE WORLD", Callback = function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer() end})
-
-TabTeleport:CreateToggle({
-   Name = "Auto Travel (15 Menit Default)",
-   CurrentValue = true,
-   Callback = function(Value) _G.AutoTravel = Value end,
-})
 
 task.spawn(function()
     while true do
