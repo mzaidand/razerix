@@ -2,7 +2,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
    Name = "Zaylinho Merchant Pro 2026",
-   LoadingTitle = "Menyiapkan Fitur Pet Merchant...",
+   LoadingTitle = "Menyiapkan Akses Pet...",
    LoadingSubtitle = "by Zaylinho",
    ConfigurationSaving = { Enabled = false },
 })
@@ -14,67 +14,12 @@ _G.AutoClaim = true
 _G.StopClaiming = false 
 local lastTravel = tick()
 local player = game.Players.LocalPlayer
+local listPetBawaan = {} -- Database nama pet asli
 
 -- ==========================================
--- TAB: SMART CLAIM
--- ==========================================
-local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
-
-local function setupDetection()
-    player.PlayerGui.DescendantAdded:Connect(function(obj)
-        if obj:IsA("TextLabel") or obj:IsA("TextBox") then
-            if string.find(string.lower(obj.Text), "already have a booth") then
-                _G.StopClaiming = true
-                Rayfield:Notify({Title = "Sistem", Content = "Booth didapat! Auto-claim berhenti.", Duration = 5})
-            end
-        end
-    end)
-end
-
-local function startClaimLoop()
-    _G.StopClaiming = false
-    task.spawn(function()
-        while _G.AutoClaim do
-            if not _G.StopClaiming then
-                local boothFolder = workspace:FindFirstChild("TradeWorld") and workspace.TradeWorld:FindFirstChild("Booths")
-                if boothFolder then
-                    for _, booth in pairs(boothFolder:GetChildren()) do
-                        if _G.StopClaiming or not _G.AutoClaim then break end
-                        if not booth:GetAttribute("Owner") or booth:GetAttribute("Owner") == 0 then
-                            pcall(function()
-                                game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.ClaimBooth:FireServer(booth)
-                            end)
-                            task.wait(0.1)
-                        end
-                    end
-                end
-            end
-            task.wait(1)
-        end
-    end)
-end
-
-TabClaim:CreateToggle({
-   Name = "Auto Claim Booth",
-   CurrentValue = true,
-   Callback = function(Value)
-      _G.AutoClaim = Value
-      if Value then startClaimLoop() end
-   end,
-})
-
-setupDetection()
-startClaimLoop()
-
--- ==========================================
--- TAB: AUTO MERCHANT (FIXED FOR PETS)
+-- TAB: AUTO MERCHANT (FIXED SEARCH)
 -- ==========================================
 local TabMerchant = Window:CreateTab("Auto Merchant", 4483362458)
-
-local listPetBawaan = {"Refresh Inventory Pet!"}
-local antreanSlots = {} 
-local antreanCounter = 0
-local isSelling = false
 
 TabMerchant:CreateButton({
    Name = "🔄 1. Refresh Inventory (Khusus Pet)",
@@ -83,7 +28,7 @@ TabMerchant:CreateButton({
       local backpack = player:FindFirstChild("Backpack")
       if backpack then
          for _, item in pairs(backpack:GetChildren()) do
-            -- Filter hanya untuk item tipe "Pet" berdasarkan atribut
+            -- Filter hanya untuk item tipe "Pet"
             local itemType = item:GetAttribute("ItemType") or item:GetAttribute("PetType")
             if itemType == "Pet" then
                if not table.find(temp, item.Name) then 
@@ -92,19 +37,14 @@ TabMerchant:CreateButton({
             end
          end
       end
-      
-      if #temp == 0 then
-         Rayfield:Notify({Title = "Sistem", Content = "Tidak ada Pet ditemukan di Backpack!", Duration = 3})
-      else
-         listPetBawaan = temp
-         -- Update semua dropdown yang sudah dibuat
-         for _, slot in pairs(antreanSlots) do
-            if slot.Dropdown then slot.Dropdown:Refresh(listPetBawaan, true) end
-         end
-         Rayfield:Notify({Title = "Sistem", Content = #temp .. " Jenis Pet Terdeteksi!", Duration = 3})
-      end
+      listPetBawaan = temp
+      Rayfield:Notify({Title = "Sistem", Content = #listPetBawaan .. " Pet Berhasil Dimuat!", Duration = 3})
    end,
 })
+
+local antreanSlots = {}
+local antreanCounter = 0
+local isSelling = false
 
 TabMerchant:CreateButton({
    Name = "➕ 2. Tambah Antrean Jual",
@@ -113,19 +53,46 @@ TabMerchant:CreateButton({
       local slotData = { Items = {}, Price = 2, Delay = 5 }
       TabMerchant:CreateSection("Urutan Antrean #" .. antreanCounter)
       
-      -- Dropdown otomatis mendukung fitur Search/Pencarian
+      -- DROPDOWN UTAMA
       local dd = TabMerchant:CreateDropdown({
-         Name = "Pilih Pet (Bisa Search)",
+         Name = "Pilih Pet (Hasil Search)",
          Options = listPetBawaan,
          CurrentOption = {},
          MultipleOptions = true,
          Flag = "Slot_" .. antreanCounter,
          Callback = function(Options) slotData.Items = Options end,
       })
+
+      -- FITUR SEARCH MANUAL
+      TabMerchant:CreateInput({
+         Name = "🔍 Cari Nama Pet (Contoh: Peacock)",
+         PlaceholderText = "Ketik di sini untuk menyaring list...",
+         NumbersOnly = false,
+         Callback = function(Text)
+            local query = string.lower(Text)
+            local filtered = {}
+            
+            -- Mencari nama pet yang mengandung kata kunci
+            for _, name in pairs(listPetBawaan) do
+               if string.find(string.lower(name), query) then
+                  table.insert(filtered, name)
+               end
+            end
+            
+            -- Refresh dropdown dengan hasil filter
+            if #filtered > 0 then
+               dd:Refresh(filtered, true)
+            elseif Text == "" then
+               dd:Refresh(listPetBawaan, true)
+            else
+               dd:Refresh({"Tidak ditemukan!"}, true)
+            end
+         end,
+      })
       
       TabMerchant:CreateInput({
          Name = "Harga (Token)",
-         PlaceholderText = "2",
+         PlaceholderText = "3",
          NumbersOnly = true,
          Callback = function(Text) slotData.Price = tonumber(Text) or 2 end,
       })
@@ -137,11 +104,11 @@ TabMerchant:CreateButton({
          Callback = function(Text) slotData.Delay = tonumber(Text) or 5 end,
       })
       
-      slotData.Dropdown = dd
       table.insert(antreanSlots, slotData)
    end,
 })
 
+-- LOGIKA PENJUALAN OTOMATIS
 local function jalankanProsesJual()
     task.spawn(function()
         while isSelling do
@@ -153,29 +120,27 @@ local function jalankanProsesJual()
                     if not backpack then break end
                     
                     for _, itemObj in pairs(backpack:GetChildren()) do
-                        -- Cek nama dan pastikan itu Pet
+                        -- Cek kecocokan nama pet
                         if itemObj.Name == petName and isSelling then
-                            -- Mengambil UUID sesuai gambar atribut anda
+                            -- Ambil UUID sesuai screenshot atribut
                             local petUUID = itemObj:GetAttribute("PET_UUID") 
                             
                             if petUUID then
-                                local sukses = false
                                 pcall(function()
-                                    -- Sesuai format SimpleSpy: [1] "Pet", [2] UUID String, [3] Harga
-                                    game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Pet", tostring(petUUID), tonumber(slot.Price))
-                                    sukses = true
+                                    -- Format InvokeServer sesuai SimpleSpy
+                                    game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer(
+                                        "Pet", 
+                                        tostring(petUUID), 
+                                        tonumber(slot.Price)
+                                    )
                                 end)
-                                
-                                if sukses then
-                                    print("Berhasil memasang pet: " .. petName)
-                                    task.wait(slot.Delay)
-                                end
+                                task.wait(slot.Delay)
                             end
                         end
                     end
                 end
             end
-            task.wait(2) -- Jeda antar putaran antrean
+            task.wait(2)
         end
     end)
 end
@@ -185,45 +150,8 @@ TabMerchant:CreateToggle({
    CurrentValue = false,
    Callback = function(Value)
       isSelling = Value
-      if Value then 
-         jalankanProsesJual() 
-         Rayfield:Notify({Title = "Sistem", Content = "Auto Merchant Aktif!", Duration = 3})
-      end
+      if Value then jalankanProsesJual() end
    end,
 })
 
--- ==========================================
--- TAB: TELEPORT
--- ==========================================
-local TabTeleport = Window:CreateTab("Teleport", 4483362458)
-
-TabTeleport:CreateButton({
-    Name = "TRAVEL TO TRADE WORLD", 
-    Callback = function() 
-        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.TravelToTradeWorld:FireServer() 
-    end
-})
-
-TabTeleport:CreateButton({
-    Name = "TRAVEL TO GARDEN", 
-    Callback = function() 
-        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.TravelToMainWorld:FireServer() 
-    end
-})
-
-TabTeleport:CreateToggle({
-   Name = "Auto Travel (Repeat)",
-   CurrentValue = true,
-   Callback = function(Value) _G.AutoTravel = Value end,
-})
-
--- Background Loop
-task.spawn(function()
-    while true do
-        task.wait(1)
-        if _G.AutoTravel and tick() - lastTravel >= _G.TravelDelay then
-            game:GetService("ReplicatedStorage").GameEvents.TradeEvents.TravelToTradeWorld:FireServer()
-            lastTravel = tick()
-        end
-    end
-end)
+-- Tambahkan Tab Teleport di bawah sini sesuai script lamamu
