@@ -68,7 +68,7 @@ setupDetection()
 startClaimLoop()
 
 -- ==========================================
--- TAB: AUTO MERCHANT (FIXED SEARCH & UUID)
+-- TAB: AUTO MERCHANT (FIXED SEARCH LOGIC)
 -- ==========================================
 local TabMerchant = Window:CreateTab("Auto Merchant", 4483362458)
 
@@ -114,12 +114,19 @@ TabMerchant:CreateButton({
          PlaceholderText = "Ketik nama...",
          NumbersOnly = false,
          Callback = function(Text)
-            local query = string.lower(Text)
-            local filtered = {}
-            for _, name in pairs(listPetBawaan) do
-               if string.find(string.lower(name), query) then table.insert(filtered, name) end
+            if Text == "" then
+                -- Jika search kosong, tampilkan semua pet asli
+                dd:Refresh(listPetBawaan, true)
+            else
+                local query = string.lower(Text)
+                local filtered = {}
+                for _, name in pairs(listPetBawaan) do
+                   if string.find(string.lower(name), query) then 
+                       table.insert(filtered, name) 
+                   end
+                end
+                dd:Refresh(filtered, true)
             end
-            dd:Refresh(filtered, true)
          end,
       })
       
@@ -168,7 +175,7 @@ TabMerchant:CreateToggle({
 })
 
 -- ==========================================
--- TAB: TELEPORT (DENGAN INPUT DELAY ASLI)
+-- TAB: TELEPORT (SESUAI ASLI)
 -- ==========================================
 local TabTeleport = Window:CreateTab("Teleport", 4483362458)
 
@@ -196,7 +203,6 @@ TabTeleport:CreateToggle({
    Callback = function(Value) _G.AutoTravel = Value end,
 })
 
--- INPUT DELAY YANG TADI HILANG
 TabTeleport:CreateInput({
    Name = "Travel Delay (Seconds)",
    PlaceholderText = "900",
@@ -207,7 +213,7 @@ TabTeleport:CreateInput({
    end,
 })
 
--- [[ BACKGROUND PROCESS ]]
+-- [[ LOGIKA BACKGROUND ]]
 task.spawn(function()
     while true do
         task.wait(1)
