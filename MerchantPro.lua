@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Zaylinho World Teleport", -- Nama asli sesuai file kamu
+   Name = "Zaylinho World Teleport",
    LoadingTitle = "Menyiapkan Akses Dunia...",
    LoadingSubtitle = "by Zaylinho",
    ConfigurationSaving = { Enabled = false },
@@ -14,10 +14,10 @@ _G.AutoClaim = true
 _G.StopClaiming = false 
 local lastTravel = tick()
 local player = game.Players.LocalPlayer
-local listPetBawaan = {} -- Database untuk Auto Merchant
+local listPetBawaan = {} 
 
 -- ==========================================
--- TAB: SMART CLAIM (TETAP ASLI)
+-- TAB: SMART CLAIM (SESUAI ASLI)
 -- ==========================================
 local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 
@@ -26,7 +26,7 @@ local function setupDetection()
         if obj:IsA("TextLabel") or obj:IsA("TextBox") then
             if string.find(string.lower(obj.Text), "already have a booth") then
                 _G.StopClaiming = true
-                Rayfield:Notify({Title = "Sistem", Content = "Booth didapat! Auto-claim berhenti.", Duration = 5})
+                Rayfield:Notify({Title = "Sistem", Content = "Booth didapat!", Duration = 5})
             end
         end
     end)
@@ -40,7 +40,7 @@ local function startClaimLoop()
                 local boothFolder = workspace:FindFirstChild("TradeWorld") and workspace.TradeWorld:FindFirstChild("Booths")
                 if boothFolder then
                     for _, booth in pairs(boothFolder:GetChildren()) do
-                        if _G.StopClaiming or not _G.AutoClaim then break end
+                        if not _G.AutoClaim or _G.StopClaiming then break end
                         if not booth:GetAttribute("Owner") or booth:GetAttribute("Owner") == 0 then
                             pcall(function()
                                 game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.ClaimBooth:FireServer(booth)
@@ -68,7 +68,7 @@ setupDetection()
 startClaimLoop()
 
 -- ==========================================
--- TAB: AUTO MERCHANT (HANYA INI YANG DIUBAH)
+-- TAB: AUTO MERCHANT (FIXED SEARCH & UUID)
 -- ==========================================
 local TabMerchant = Window:CreateTab("Auto Merchant", 4483362458)
 
@@ -77,17 +77,14 @@ local antreanCounter = 0
 local isSelling = false
 
 TabMerchant:CreateButton({
-   Name = "🔄 1. Refresh Inventory (Khusus Pet)",
+   Name = "🔄 1. Refresh Inventory (Pet)",
    Callback = function()
       local temp = {}
       local backpack = player:FindFirstChild("Backpack")
       if backpack then
          for _, item in pairs(backpack:GetChildren()) do
-            -- Filter PET_UUID dan ItemType Pet
             if item:GetAttribute("ItemType") == "Pet" or item:GetAttribute("PET_UUID") then
-               if not table.find(temp, item.Name) then 
-                  table.insert(temp, item.Name) 
-               end
+               if not table.find(temp, item.Name) then table.insert(temp, item.Name) end
             end
          end
       end
@@ -114,7 +111,7 @@ TabMerchant:CreateButton({
 
       TabMerchant:CreateInput({
          Name = "🔍 Cari Pet",
-         PlaceholderText = "Ketik nama pet...",
+         PlaceholderText = "Ketik nama...",
          NumbersOnly = false,
          Callback = function(Text)
             local query = string.lower(Text)
@@ -126,19 +123,8 @@ TabMerchant:CreateButton({
          end,
       })
       
-      TabMerchant:CreateInput({
-         Name = "Harga",
-         PlaceholderText = "2",
-         NumbersOnly = true,
-         Callback = function(Text) slotData.Price = tonumber(Text) or 2 end,
-      })
-      
-      TabMerchant:CreateInput({
-         Name = "Jeda",
-         PlaceholderText = "5",
-         NumbersOnly = true,
-         Callback = function(Text) slotData.Delay = tonumber(Text) or 5 end,
-      })
+      TabMerchant:CreateInput({Name = "Harga", PlaceholderText = "2", NumbersOnly = true, Callback = function(Text) slotData.Price = tonumber(Text) or 2 end})
+      TabMerchant:CreateInput({Name = "Jeda", PlaceholderText = "5", NumbersOnly = true, Callback = function(Text) slotData.Delay = tonumber(Text) or 5 end})
       
       table.insert(antreanSlots, slotData)
    end,
@@ -151,9 +137,9 @@ local function jalankanJual()
                 if not isSelling then break end
                 for _, petName in ipairs(slot.Items) do
                     if not isSelling then break end
-                    local backpack = player:FindFirstChild("Backpack")
-                    if backpack then
-                        for _, item in pairs(backpack:GetChildren()) do
+                    local bp = player:FindFirstChild("Backpack")
+                    if bp then
+                        for _, item in pairs(bp:GetChildren()) do
                             if item.Name == petName and isSelling then
                                 local uuid = item:GetAttribute("PET_UUID") 
                                 if uuid then
@@ -182,21 +168,25 @@ TabMerchant:CreateToggle({
 })
 
 -- ==========================================
--- TAB: TELEPORT (TETAP ASLI)
+-- TAB: TELEPORT (DENGAN INPUT DELAY ASLI)
 -- ==========================================
 local TabTeleport = Window:CreateTab("Teleport", 4483362458)
 
 TabTeleport:CreateButton({
    Name = "TRAVEL TO TRADE WORLD",
    Callback = function()
-      game:GetService("ReplicatedStorage").GameEvents.TradeEvents.TravelToTradeWorld:FireServer()
+      pcall(function()
+         game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer()
+      end)
    end,
 })
 
 TabTeleport:CreateButton({
    Name = "TRAVEL TO MAIN WORLD",
    Callback = function()
-      game:GetService("ReplicatedStorage").GameEvents.TradeEvents.TravelToMainWorld:FireServer()
+      pcall(function()
+         game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer()
+      end)
    end,
 })
 
@@ -206,17 +196,31 @@ TabTeleport:CreateToggle({
    Callback = function(Value) _G.AutoTravel = Value end,
 })
 
--- [[ LOGIKA BACKGROUND TETAP ASLI ]]
+-- INPUT DELAY YANG TADI HILANG
+TabTeleport:CreateInput({
+   Name = "Travel Delay (Seconds)",
+   PlaceholderText = "900",
+   NumbersOnly = true,
+   Callback = function(Text)
+      _G.TravelDelay = tonumber(Text) or 900
+      Rayfield:Notify({Title = "Sistem", Content = "Delay travel diubah ke: " .. _G.TravelDelay .. " detik", Duration = 3})
+   end,
+})
+
+-- [[ BACKGROUND PROCESS ]]
 task.spawn(function()
     while true do
         task.wait(1)
         if _G.AutoTravel and tick() - lastTravel >= _G.TravelDelay then
-            game:GetService("ReplicatedStorage").GameEvents.TradeEvents.TravelToTradeWorld:FireServer()
+            pcall(function()
+               game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer()
+            end)
             lastTravel = tick()
         end
     end
 end)
 
+-- ANTI-AFK
 local vu = game:GetService("VirtualUser")
 player.Idled:Connect(function()
     vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
