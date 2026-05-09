@@ -2,7 +2,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
    Name = "Zaylinho Merchant Pro 2026",
-   LoadingTitle = "Mengintegrasikan Data SimpleSpy...",
+   LoadingTitle = "Restoring Travel Features...",
    LoadingSubtitle = "by Zaylinho",
    ConfigurationSaving = { Enabled = false },
 })
@@ -16,7 +16,7 @@ local lastTravel = tick()
 local player = game.Players.LocalPlayer
 
 -- ==========================================
--- TAB 1: SMART CLAIM
+-- TAB 1: SMART CLAIM (ANTI-SPAM)
 -- ==========================================
 local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 
@@ -25,6 +25,7 @@ local function setupDetection()
         if obj:IsA("TextLabel") or obj:IsA("TextBox") then
             if string.find(string.lower(obj.Text), "already have a booth") then
                 _G.StopClaiming = true
+                Rayfield:Notify({Title = "Sistem", Content = "Booth didapat! Auto-claim berhenti.", Duration = 5})
             end
         end
     end)
@@ -66,7 +67,7 @@ setupDetection()
 startClaimLoop()
 
 -- ==========================================
--- TAB 2: AUTO MERCHANT (FIXED BY SIMPLESPY)
+-- TAB 2: AUTO MERCHANT (SIMPLESPY LOGIC)
 -- ==========================================
 local TabMerchant = Window:CreateTab("Auto Merchant", 4483362458)
 
@@ -82,9 +83,7 @@ TabMerchant:CreateButton({
       local backpack = player:FindFirstChild("Backpack")
       if backpack then
          for _, item in pairs(backpack:GetChildren()) do
-            if not table.find(temp, item.Name) then
-               table.insert(temp, item.Name)
-            end
+            if not table.find(temp, item.Name) then table.insert(temp, item.Name) end
          end
       end
       listBawaan = temp
@@ -100,11 +99,10 @@ TabMerchant:CreateButton({
    Callback = function()
       antreanCounter = antreanCounter + 1
       local slotData = { Items = {}, Price = 2, Delay = 5 }
-      
       TabMerchant:CreateSection("Urutan Antrean #" .. antreanCounter)
       
       local dd = TabMerchant:CreateDropdown({
-         Name = "Pilih Item (Search & Multi)",
+         Name = "Pilih Item (Multi & Search)",
          Options = listBawaan,
          CurrentOption = {},
          MultipleOptions = true,
@@ -114,14 +112,14 @@ TabMerchant:CreateButton({
       
       TabMerchant:CreateInput({
          Name = "Harga Token",
-         PlaceholderText = "Default: 2",
+         PlaceholderText = "2",
          NumbersOnly = true,
          Callback = function(Text) slotData.Price = tonumber(Text) or 2 end,
       })
       
       TabMerchant:CreateInput({
-         Name = "Jeda Jual (Detik)",
-         PlaceholderText = "Default: 5",
+         Name = "Delay Jual (Detik)",
+         PlaceholderText = "5",
          NumbersOnly = true,
          Callback = function(Text) slotData.Delay = tonumber(Text) or 5 end,
       })
@@ -136,40 +134,22 @@ local function jalankanProsesJual()
         while isSelling do
             for _, slot in ipairs(antreanSlots) do
                 if not isSelling then break end
-                
                 for _, itemName in ipairs(slot.Items) do
                     if not isSelling then break end
-                    
                     local backpack = player:FindFirstChild("Backpack")
                     if not backpack then break end
-                    
                     for _, itemObj in pairs(backpack:GetChildren()) do
                         if itemObj.Name == itemName and isSelling then
-                            -- MENGAMBIL ID UUID SESUAI SIMPLESPY (Contoh: {0918d8ef...})
                             local itemID = itemObj:GetAttribute("c") or itemObj:GetAttribute("ID")
-                            
                             if itemID then
                                 local terpasang = false
-                                
                                 while not terpasang and isSelling do
                                     pcall(function()
-                                        -- FORMAT BARU SESUAI LOG SIMPLESPY
-                                        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer(
-                                            "Pet", 
-                                            tostring(itemID), 
-                                            tonumber(slot.Price)
-                                        )
+                                        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Pet", tostring(itemID), tonumber(slot.Price))
                                     end)
-                                    
-                                    task.wait(2) -- Memberi waktu server memproses
-                                    
-                                    -- Cross-check fisik
-                                    if not itemObj.Parent or itemObj.Parent ~= player.Backpack then
-                                        terpasang = true
-                                        Rayfield:Notify({Title = "Sukses", Content = itemName .. " Terpasang!", Duration = 2})
-                                    end
+                                    task.wait(2.5)
+                                    if not itemObj.Parent or itemObj.Parent ~= player.Backpack then terpasang = true end
                                 end
-                                
                                 if terpasang then task.wait(slot.Delay) end
                             end
                         end
@@ -191,11 +171,38 @@ TabMerchant:CreateToggle({
 })
 
 -- ==========================================
--- TAB 3: TELEPORT
+-- TAB 3: TELEPORT (RE-ADDED FEATURES)
 -- ==========================================
 local TabTeleport = Window:CreateTab("Teleport", 4483362458)
-TabTeleport:CreateButton({Name = "TRAVEL TO TRADE WORLD", Callback = function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer() end})
 
+TabTeleport:CreateButton({
+    Name = "TRAVEL TO TRADE WORLD", 
+    Callback = function() 
+        game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer() 
+    end
+})
+
+TabTeleport:CreateButton({
+    Name = "TRAVEL TO GARDEN", 
+    Callback = function() 
+        game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer() 
+    end
+})
+
+TabTeleport:CreateToggle({
+   Name = "Auto Travel (Repeat)",
+   CurrentValue = true,
+   Callback = function(Value) _G.AutoTravel = Value end,
+})
+
+TabTeleport:CreateInput({
+   Name = "Jeda Auto Travel (Detik)",
+   PlaceholderText = "900",
+   CurrentValue = "900",
+   Callback = function(Text) _G.TravelDelay = tonumber(Text) or 900 end,
+})
+
+-- Background Loop for Auto Travel
 task.spawn(function()
     while true do
         task.wait(1)
