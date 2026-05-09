@@ -8,16 +8,15 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- Variabel Global
-_G.HargaJual = 2
 _G.AutoTravel = true
-_G.TravelDelay = 900
+_G.TravelDelay = 900 
 _G.AutoClaim = true 
 _G.StopClaiming = false 
 local lastTravel = tick()
 local player = game.Players.LocalPlayer
 
 -- ==========================================
--- TAB 1: SMART CLAIM (IMAGE DETECTOR LOGIC)
+-- TAB 1: SMART CLAIM (IMAGE DETECTOR)
 -- ==========================================
 local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 
@@ -75,129 +74,147 @@ setupDetection()
 startClaimLoop()
 
 -- ==========================================
--- TAB 2: AUTO MERCHANT (SISTEM ANTREAN DINAMIS)
+-- TAB 2: AUTO MERCHANT (DYNAMIC QUEUE & CROSS-CHECK)
 -- ==========================================
 local TabMerchant = Window:CreateTab("Auto Merchant", 4483362458)
 
-local antreanJual = {}
-local itemTerpilih = ""
-local delayTerpilih = 5
+local listBawaan = {"Klik Refresh Dulu!"}
+local antreanSlots = {} -- Menyimpan data menu yang di-generate
+local antreanCounter = 0
 local isSelling = false
 
-local StatusAntrean = TabMerchant:CreateLabel("Daftar Antrean:\nKosong")
-
-local DropdownItem = TabMerchant:CreateDropdown({
-   Name = "Pilih Item (Dari Inventory)",
-   Options = {"Klik Refresh Dulu!"},
-   CurrentOption = {"Klik Refresh Dulu!"},
-   MultipleOptions = false,
-   Flag = "DropdownItem",
-   Callback = function(Options)
-      itemTerpilih = Options[1]
-   end,
-})
-
 TabMerchant:CreateButton({
-   Name = "🔄 Refresh Isi Inventory",
+   Name = "🔄 1. Refresh Isi Inventory",
    Callback = function()
-      local listBawaan = {}
+      local temp = {}
       local backpack = player:FindFirstChild("Backpack")
       if backpack then
          for _, item in pairs(backpack:GetChildren()) do
-            local namaItem = item.Name
-            -- Hindari memasukkan nama yang sama berkali-kali ke dropdown
-            if not table.find(listBawaan, namaItem) then
-               table.insert(listBawaan, namaItem)
+            if not table.find(temp, item.Name) then
+               table.insert(temp, item.Name)
             end
          end
       end
       
-      if #listBawaan == 0 then table.insert(listBawaan, "Inventory Kosong") end
-      DropdownItem:Refresh(listBawaan, {listBawaan[1]})
-      itemTerpilih = listBawaan[1]
-      Rayfield:Notify({Title = "Berhasil", Content = "Daftar inventory telah diperbarui!", Duration = 3})
-   end,
-})
-
-TabMerchant:CreateInput({
-   Name = "Delay Jual (Detik)",
-   PlaceholderText = "5",
-   CurrentValue = "5",
-   Numeric = true,
-   Callback = function(Text)
-      delayTerpilih = tonumber(Text) or 5
-   end,
-})
-
-local function perbaruiLabelAntrean()
-    if #antreanJual == 0 then
-        StatusAntrean:Set("Daftar Antrean:\nKosong")
-    else
-        local teks = "Daftar Antrean:\n"
-        for i, data in ipairs(antreanJual) do
-            teks = teks .. i .. ". " .. data.Item .. " (" .. data.Delay .. "s)\n"
-        end
-        StatusAntrean:Set(teks)
-    end
-end
-
-TabMerchant:CreateButton({
-   Name = "➕ Tambah ke Antrean",
-   Callback = function()
-      if itemTerpilih ~= "" and itemTerpilih ~= "Klik Refresh Dulu!" and itemTerpilih ~= "Inventory Kosong" then
-         table.insert(antreanJual, {Item = itemTerpilih, Delay = delayTerpilih})
-         perbaruiLabelAntrean()
-      else
-         Rayfield:Notify({Title = "Gagal", Content = "Pilih item yang valid dulu!", Duration = 3})
+      if #temp == 0 then table.insert(temp, "Kosong") end
+      listBawaan = temp
+      
+      -- Refresh semua dropdown di antrean yang sudah dibuat
+      for _, slot in pairs(antreanSlots) do
+         if slot.Dropdown then
+            slot.Dropdown:Refresh(listBawaan, {})
+         end
       end
+      Rayfield:Notify({Title = "Sistem", Content = "Daftar inventory telah diperbarui!", Duration = 3})
    end,
 })
 
 TabMerchant:CreateButton({
-   Name = "🗑️ Hapus Semua Antrean",
+   Name = "➕ 2. Tambah Menu Antrean",
    Callback = function()
-      antreanJual = {}
-      perbaruiLabelAntrean()
+      antreanCounter = antreanCounter + 1
+      local slotData = { Items = {}, Price = 5, Delay = 5 }
+      
+      TabMerchant:CreateSection("=== Urutan Antrean #" .. antreanCounter .. " ===")
+      
+      local dd = TabMerchant:CreateDropdown({
+         Name = "Pilih Item (Bisa > 1 & Search)",
+         Options = listBawaan,
+         CurrentOption = {},
+         MultipleOptions = true, -- MENGIZINKAN PILIH BANYAK
+         Flag = "DD_" .. antreanCounter,
+         Callback = function(Options)
+            slotData.Items = Options
+         end,
+      })
+      
+      TabMerchant:CreateInput({
+         Name = "Harga Token (Per Item)",
+         PlaceholderText = "Misal: 5",
+         NumbersOnly = true,
+         Callback = function(Text)
+            slotData.Price = tonumber(Text) or 5
+         end,
+      })
+      
+      TabMerchant:CreateInput({
+         Name = "Delay Jual (Detik)",
+         PlaceholderText = "Misal: 5",
+         NumbersOnly = true,
+         Callback = function(Text)
+            slotData.Delay = tonumber(Text) or 5
+         end,
+      })
+      
+      slotData.Dropdown = dd
+      table.insert(antreanSlots, slotData)
    end,
 })
 
+-- LOGIKA PENJUALAN DENGAN CROSS-CHECK KETAT
 local function mulaiJualan()
     task.spawn(function()
         while isSelling do
-            if #antreanJual > 0 then
-                local backpack = player:FindFirstChild("Backpack")
-                if backpack then
-                    -- Looping mengecek daftar antrean yang kita buat
-                    for _, tugas in ipairs(antreanJual) do
+            local backpack = player:FindFirstChild("Backpack")
+            if not backpack then task.wait(1) continue end
+            
+            -- Eksekusi berdasarkan urutan antrean yang dibuat
+            for i, slot in ipairs(antreanSlots) do
+                if not isSelling then break end
+                if #slot.Items == 0 then continue end
+                
+                local harga = slot.Price
+                local delay = slot.Delay
+                
+                -- Untuk setiap item yang dipilih di dropdown tersebut
+                for _, itemName in ipairs(slot.Items) do
+                    if not isSelling then break end
+                    
+                    -- Cari item fisik di tas
+                    local itemsToSell = {}
+                    for _, item in pairs(backpack:GetChildren()) do
+                        if item.Name == itemName then
+                            table.insert(itemsToSell, item)
+                        end
+                    end
+                    
+                    -- Jual satu per satu dari jumlah yang ada
+                    for _, itemObj in ipairs(itemsToSell) do
                         if not isSelling then break end
                         
-                        local targetNama = tugas.Item
-                        local waktuTunggu = tugas.Delay
-                        
-                        -- Cari item di backpack yang sesuai dengan target antrean
-                        for _, item in pairs(backpack:GetChildren()) do
-                            if not isSelling then break end
+                        local itemID = itemObj:GetAttribute("c")
+                        if itemID then
+                            local success = false
                             
-                            if item.Name == targetNama then
-                                local itemID = item:GetAttribute("c")
-                                if itemID then
-                                    pcall(function()
-                                        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(itemID), _G.HargaJual)
-                                    end)
-                                    task.wait(waktuTunggu) -- Tunggu sesuai delay yang disetting untuk item ini
+                            -- STRICT CROSS-CHECK LOOP: Tunggu sampai item beneran masuk booth
+                            while not success and isSelling do
+                                pcall(function()
+                                    game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(itemID), harga)
+                                end)
+                                
+                                task.wait(1.5) -- Waktu tunggu loading game
+                                
+                                -- Pengecekan Fisik: Jika item sudah tidak ada di tas, berarti sukses terlisting
+                                if not itemObj.Parent or itemObj.Parent ~= player.Backpack then
+                                    success = true
                                 end
+                            end
+                            
+                            -- Hanya eksekusi delay jika sukses terlisting
+                            if success then
+                                task.wait(delay)
                             end
                         end
                     end
                 end
             end
-            task.wait(2) -- Jeda loop utama agar game tidak crash
+            task.wait(2) -- Jeda antar pengulangan antrean besar
         end
     end)
 end
 
 TabMerchant:CreateToggle({
-   Name = "Mulai Auto Merchant",
+   Name = "🚀 3. MULAI AUTO MERCHANT",
    CurrentValue = false,
    Callback = function(Value)
       isSelling = Value
