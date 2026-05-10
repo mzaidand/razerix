@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Zaylinho World Teleport",
+   Name = "Zaylinho Merchant Pro 2026",
    LoadingTitle = "Menyiapkan Akses Dunia...",
    LoadingSubtitle = "by Zaylinho",
    ConfigurationSaving = { Enabled = false },
@@ -14,7 +14,10 @@ _G.AutoClaim = true
 _G.StopClaiming = false 
 local lastTravel = tick()
 local player = game.Players.LocalPlayer
+
+-- Database Inventory
 local listPetBawaan = {} 
+local listFruitBawaan = {}
 
 -- ==========================================
 -- TAB: SMART CLAIM (SESUAI ASLI)
@@ -68,15 +71,14 @@ setupDetection()
 startClaimLoop()
 
 -- ==========================================
--- TAB: AUTO MERCHANT (FIXED SEARCH LOGIC)
+-- TAB: PET MERCHANT (SESUAI ASLI)
 -- ==========================================
-local TabMerchant = Window:CreateTab("Auto Merchant", 4483362458)
+local TabPetMerchant = Window:CreateTab("Pet Merchant", 4483362458)
 
-local antreanSlots = {}
-local antreanCounter = 0
-local isSelling = false
+local antreanPetSlots = {}
+local isSellingPet = false
 
-TabMerchant:CreateButton({
+TabPetMerchant:CreateButton({
    Name = "🔄 1. Refresh Inventory (Pet)",
    Callback = function()
       local temp = {}
@@ -93,61 +95,54 @@ TabMerchant:CreateButton({
    end,
 })
 
-TabMerchant:CreateButton({
+TabPetMerchant:CreateButton({
    Name = "➕ 2. Tambah Antrean Jual",
    Callback = function()
-      antreanCounter = antreanCounter + 1
       local slotData = { Items = {}, Price = 2, Delay = 5 }
-      TabMerchant:CreateSection("Urutan Antrean #" .. antreanCounter)
+      TabPetMerchant:CreateSection("Urutan Antrean")
       
-      local dd = TabMerchant:CreateDropdown({
+      local dd = TabPetMerchant:CreateDropdown({
          Name = "Pilih Pet",
          Options = listPetBawaan,
          CurrentOption = {},
          MultipleOptions = true,
-         Flag = "Slot_" .. antreanCounter,
          Callback = function(Options) slotData.Items = Options end,
       })
 
-      TabMerchant:CreateInput({
+      TabPetMerchant:CreateInput({
          Name = "🔍 Cari Pet",
          PlaceholderText = "Ketik nama...",
-         NumbersOnly = false,
          Callback = function(Text)
             if Text == "" then
-                -- Jika search kosong, tampilkan semua pet asli
                 dd:Refresh(listPetBawaan, true)
             else
                 local query = string.lower(Text)
                 local filtered = {}
                 for _, name in pairs(listPetBawaan) do
-                   if string.find(string.lower(name), query) then 
-                       table.insert(filtered, name) 
-                   end
+                   if string.find(string.lower(name), query) then table.insert(filtered, name) end
                 end
                 dd:Refresh(filtered, true)
             end
          end,
       })
       
-      TabMerchant:CreateInput({Name = "Harga", PlaceholderText = "2", NumbersOnly = true, Callback = function(Text) slotData.Price = tonumber(Text) or 2 end})
-      TabMerchant:CreateInput({Name = "Jeda", PlaceholderText = "5", NumbersOnly = true, Callback = function(Text) slotData.Delay = tonumber(Text) or 5 end})
+      TabPetMerchant:CreateInput({Name = "Harga", PlaceholderText = "2", NumbersOnly = true, Callback = function(Text) slotData.Price = tonumber(Text) or 2 end})
+      TabPetMerchant:CreateInput({Name = "Jeda", PlaceholderText = "5", NumbersOnly = true, Callback = function(Text) slotData.Delay = tonumber(Text) or 5 end})
       
-      table.insert(antreanSlots, slotData)
+      table.insert(antreanPetSlots, slotData)
    end,
 })
 
-local function jalankanJual()
+local function jalankanJualPet()
     task.spawn(function()
-        while isSelling do
-            for _, slot in ipairs(antreanSlots) do
-                if not isSelling then break end
+        while isSellingPet do
+            for _, slot in ipairs(antreanPetSlots) do
+                if not isSellingPet then break end
                 for _, petName in ipairs(slot.Items) do
-                    if not isSelling then break end
                     local bp = player:FindFirstChild("Backpack")
                     if bp then
                         for _, item in pairs(bp:GetChildren()) do
-                            if item.Name == petName and isSelling then
+                            if item.Name == petName and isSellingPet then
                                 local uuid = item:GetAttribute("PET_UUID") 
                                 if uuid then
                                     pcall(function()
@@ -165,12 +160,115 @@ local function jalankanJual()
     end)
 end
 
-TabMerchant:CreateToggle({
-   Name = "🚀 MULAI AUTO MERCHANT",
+TabPetMerchant:CreateToggle({
+   Name = "🚀 MULAI AUTO MERCHANT PET",
    CurrentValue = false,
    Callback = function(Value)
-      isSelling = Value
-      if Value then jalankanJual() end
+      isSellingPet = Value
+      if Value then jalankanJualPet() end
+   end,
+})
+
+-- ==========================================
+-- TAB: FRUIT MERCHANT (FITUR BARU)
+-- ==========================================
+local TabFruitMerchant = Window:CreateTab("Fruit Merchant", 4483362458)
+
+local antreanFruitSlots = {}
+local isSellingFruit = false
+
+TabFruitMerchant:CreateButton({
+   Name = "🔄 1. Refresh Inventory (Fruit)",
+   Callback = function()
+      local temp = {}
+      local backpack = player:FindFirstChild("Backpack")
+      if backpack then
+         for _, item in pairs(backpack:GetChildren()) do
+            -- Berdasarkan screenshot Bone Blossom, item buah memiliki atribut 'c' sebagai UUID
+            -- dan biasanya memiliki atribut 'b' dengan value 'j'
+            if item:GetAttribute("b") == "j" or (not item:GetAttribute("PET_UUID") and item:GetAttribute("c")) then
+               if not table.find(temp, item.Name) then table.insert(temp, item.Name) end
+            end
+         end
+      end
+      listFruitBawaan = temp
+      Rayfield:Notify({Title = "Sistem", Content = #listFruitBawaan .. " Buah Terdeteksi!", Duration = 3})
+   end,
+})
+
+TabFruitMerchant:CreateButton({
+   Name = "➕ 2. Tambah Antrean Jual",
+   Callback = function()
+      local slotData = { Items = {}, Price = 2, Delay = 5 }
+      TabFruitMerchant:CreateSection("Urutan Antrean")
+      
+      local dd = TabFruitMerchant:CreateDropdown({
+         Name = "Pilih Buah",
+         Options = listFruitBawaan,
+         CurrentOption = {},
+         MultipleOptions = true,
+         Callback = function(Options) slotData.Items = Options end,
+      })
+
+      TabFruitMerchant:CreateInput({
+         Name = "🔍 Cari Buah",
+         PlaceholderText = "Ketik nama buah...",
+         Callback = function(Text)
+            if Text == "" then
+                dd:Refresh(listFruitBawaan, true)
+            else
+                local query = string.lower(Text)
+                local filtered = {}
+                for _, name in pairs(listFruitBawaan) do
+                   if string.find(string.lower(name), query) then table.insert(filtered, name) end
+                end
+                dd:Refresh(filtered, true)
+            end
+         end,
+      })
+      
+      TabFruitMerchant:CreateInput({Name = "Harga", PlaceholderText = "2", NumbersOnly = true, Callback = function(Text) slotData.Price = tonumber(Text) or 2 end})
+      TabFruitMerchant:CreateInput({Name = "Jeda", PlaceholderText = "5", NumbersOnly = true, Callback = function(Text) slotData.Delay = tonumber(Text) or 5 end})
+      
+      table.insert(antreanFruitSlots, slotData)
+   end,
+})
+
+local function jalankanJualFruit()
+    task.spawn(function()
+        while isSellingFruit do
+            for _, slot in ipairs(antreanFruitSlots) do
+                if not isSellingFruit then break end
+                for _, fruitName in ipairs(slot.Items) do
+                    local bp = player:FindFirstChild("Backpack")
+                    if bp then
+                        for _, item in pairs(bp:GetChildren()) do
+                            if item.Name == fruitName and isSellingFruit then
+                                -- Menggunakan atribut 'c' sesuai screenshot Bone Blossom
+                                local uuid = item:GetAttribute("c") 
+                                if uuid then
+                                    pcall(function()
+                                        -- Menggunakan argumen "Fruit" untuk kategori buah
+                                        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Fruit", tostring(uuid), tonumber(slot.Price))
+                                    end)
+                                    task.wait(slot.Delay)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+TabFruitMerchant:CreateToggle({
+   Name = "🚀 MULAI AUTO MERCHANT FRUIT",
+   CurrentValue = false,
+   Callback = function(Value)
+      isSellingFruit = Value
+      if Value then jalankanJualFruit() end
    end,
 })
 
