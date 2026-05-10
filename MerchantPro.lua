@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Zaylinho Merchant Pro 2026",
+   Name = "Zaylinho World Teleport",
    LoadingTitle = "Menyiapkan Akses Dunia...",
    LoadingSubtitle = "by Zaylinho",
    ConfigurationSaving = { Enabled = false },
@@ -20,7 +20,7 @@ local listPetBawaan = {}
 local listFruitBawaan = {}
 
 -- ==========================================
--- TAB: SMART CLAIM (SESUAI ASLI)
+-- TAB: SMART CLAIM (TETAP ASLI)
 -- ==========================================
 local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 
@@ -71,7 +71,7 @@ setupDetection()
 startClaimLoop()
 
 -- ==========================================
--- TAB: PET MERCHANT (SESUAI ASLI)
+-- TAB: PET MERCHANT (TETAP ASLI)
 -- ==========================================
 local TabPetMerchant = Window:CreateTab("Pet Merchant", 4483362458)
 
@@ -85,7 +85,7 @@ TabPetMerchant:CreateButton({
       local backpack = player:FindFirstChild("Backpack")
       if backpack then
          for _, item in pairs(backpack:GetChildren()) do
-            if item:GetAttribute("ItemType") == "Pet" or item:GetAttribute("PET_UUID") then
+            if item:GetAttribute("PET_UUID") then
                if not table.find(temp, item.Name) then table.insert(temp, item.Name) end
             end
          end
@@ -170,7 +170,7 @@ TabPetMerchant:CreateToggle({
 })
 
 -- ==========================================
--- TAB: FRUIT MERCHANT (FITUR BARU)
+-- TAB: FRUIT MERCHANT (FIXED LOGIC)
 -- ==========================================
 local TabFruitMerchant = Window:CreateTab("Fruit Merchant", 4483362458)
 
@@ -184,9 +184,9 @@ TabFruitMerchant:CreateButton({
       local backpack = player:FindFirstChild("Backpack")
       if backpack then
          for _, item in pairs(backpack:GetChildren()) do
-            -- Berdasarkan screenshot Bone Blossom, item buah memiliki atribut 'c' sebagai UUID
-            -- dan biasanya memiliki atribut 'b' dengan value 'j'
-            if item:GetAttribute("b") == "j" or (not item:GetAttribute("PET_UUID") and item:GetAttribute("c")) then
+            -- Berdasarkan Dex & SimpleSpy, buah (Bone Blossom) pakai atribut 'c'
+            -- dan tipenya bukan Pet.
+            if item:GetAttribute("c") and not item:GetAttribute("PET_UUID") then
                if not table.find(temp, item.Name) then table.insert(temp, item.Name) end
             end
          end
@@ -200,7 +200,7 @@ TabFruitMerchant:CreateButton({
    Name = "➕ 2. Tambah Antrean Jual",
    Callback = function()
       local slotData = { Items = {}, Price = 2, Delay = 5 }
-      TabFruitMerchant:CreateSection("Urutan Antrean")
+      TabFruitMerchant:CreateSection("Urutan Antrean Buah")
       
       local dd = TabFruitMerchant:CreateDropdown({
          Name = "Pilih Buah",
@@ -215,7 +215,7 @@ TabFruitMerchant:CreateButton({
          PlaceholderText = "Ketik nama buah...",
          Callback = function(Text)
             if Text == "" then
-                dd:Refresh(listFruitBawaan, true)
+                dd:Refresh(listFruitBawaan, true) -- Tampilkan semua jika kosong
             else
                 local query = string.lower(Text)
                 local filtered = {}
@@ -244,12 +244,11 @@ local function jalankanJualFruit()
                     if bp then
                         for _, item in pairs(bp:GetChildren()) do
                             if item.Name == fruitName and isSellingFruit then
-                                -- Menggunakan atribut 'c' sesuai screenshot Bone Blossom
-                                local uuid = item:GetAttribute("c") 
+                                local uuid = item:GetAttribute("c") -- UUID di atribut 'c'
                                 if uuid then
                                     pcall(function()
-                                        -- Menggunakan argumen "Fruit" untuk kategori buah
-                                        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Fruit", tostring(uuid), tonumber(slot.Price))
+                                        -- FIX: Menggunakan "Holdable" sesuai SimpleSpy kamu
+                                        game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(uuid), tonumber(slot.Price))
                                     end)
                                     task.wait(slot.Delay)
                                 end
@@ -273,7 +272,7 @@ TabFruitMerchant:CreateToggle({
 })
 
 -- ==========================================
--- TAB: TELEPORT (SESUAI ASLI)
+-- TAB: TELEPORT (TETAP ASLI)
 -- ==========================================
 local TabTeleport = Window:CreateTab("Teleport", 4483362458)
 
@@ -307,7 +306,6 @@ TabTeleport:CreateInput({
    NumbersOnly = true,
    Callback = function(Text)
       _G.TravelDelay = tonumber(Text) or 900
-      Rayfield:Notify({Title = "Sistem", Content = "Delay travel diubah ke: " .. _G.TravelDelay .. " detik", Duration = 3})
    end,
 })
 
