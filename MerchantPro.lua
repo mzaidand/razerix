@@ -35,13 +35,14 @@ local listPetBawaan = {}
 local listFruitBawaan = {}
 
 -- ==========================================
--- TAB: SMART CLAIM (LOGIKA TERBARU: TELEPORT & CARI TERDEKAT)
+-- TAB: SMART CLAIM (LOGIKA TERBARU: SPAM SAMPAI DAPAT)
 -- ==========================================
 local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 
 local function setupDetection()
     player.PlayerGui.DescendantAdded:Connect(function(obj)
         if obj:IsA("TextLabel") or obj:IsA("TextBox") then
+            -- Deteksi sukses
             if string.find(string.lower(obj.Text), "already have a booth") then
                 _G.StopClaiming = true
                 Rayfield:Notify({Title = "Sistem", Content = "Booth berhasil didapat!", Duration = 5})
@@ -60,42 +61,48 @@ local function startClaimLoop()
                 local boothFolder = workspace:FindFirstChild("TradeWorld") and workspace.TradeWorld:FindFirstChild("Booths")
                 
                 if hrp and boothFolder then
-                    -- 1. Teleport ke Area Booth (Sesuai SimpleSpy)
+                    -- 1. Teleport ke Area Booth
                     pcall(function()
                         game:GetService("ReplicatedStorage").GameEvents.PlayerTeleportTriggered:FireServer("Booth")
                     end)
                     
-                    task.wait(0.5) -- Tunggu setengah detik agar karakter sampai di lokasi
+                    task.wait(0.5) -- Tunggu mendarat
                     
-                    -- 2. Cari Booth Kosong Terdekat
-                    local boothTerdekat = nil
-                    local jarakTerkecil = math.huge -- Set nilai awal jarak sebesar mungkin
-                    
+                    -- 2. Kumpulkan semua booth kosong dan urutkan berdasarkan jarak
+                    local boothKosong = {}
                     for _, booth in pairs(boothFolder:GetChildren()) do
                         if not _G.AutoClaim or _G.StopClaiming then break end
                         
-                        -- Cek apakah booth kosong
+                        -- Cek apakah atribut owner kosong
                         if not booth:GetAttribute("Owner") or booth:GetAttribute("Owner") == 0 then
-                            -- Hitung jarak dari badan karakter ke booth
                             local boothPos = booth:GetPivot().Position
                             local jarak = (hrp.Position - boothPos).Magnitude
-                            
-                            if jarak < jarakTerkecil then
-                                jarakTerkecil = jarak
-                                boothTerdekat = booth
-                            end
+                            table.insert(boothKosong, {booth = booth, jarak = jarak})
                         end
                     end
                     
-                    -- 3. Claim Booth yang Paling Dekat
-                    if boothTerdekat and not _G.StopClaiming then
-                        pcall(function()
-                            game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.ClaimBooth:FireServer(boothTerdekat)
-                        end)
+                    -- Urutkan dari yang terdekat ke terjauh
+                    table.sort(boothKosong, function(a, b)
+                        return a.jarak < b.jarak
+                    end)
+                    
+                    -- 3. Coba claim satu per satu dari yang terdekat
+                    for _, data in ipairs(boothKosong) do
+                        if _G.StopClaiming or not _G.AutoClaim then break end
+                        
+                        -- Pengecekan ekstra: Pastikan masih kosong sebelum ditembak
+                        if not data.booth:GetAttribute("Owner") or data.booth:GetAttribute("Owner") == 0 then
+                            pcall(function()
+                                game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.ClaimBooth:FireServer(data.booth)
+                            end)
+                            
+                            -- Beri jeda kecil agar server bisa merespon sebelum mencoba booth berikutnya
+                            task.wait(0.3) 
+                        end
                     end
                 end
             end
-            task.wait(1.5) -- Jeda loop agar tidak ngespam teleport
+            task.wait(1.5) -- Jeda antar siklus pencarian
         end
     end)
 end
