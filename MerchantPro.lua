@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Zaylinho World Teleport",
+   Name = "Zaylinho Merchant Pro 2026",
    LoadingTitle = "Menyiapkan Akses Dunia...",
    LoadingSubtitle = "by Zaylinho",
    ConfigurationSaving = { 
@@ -11,11 +11,11 @@ local Window = Rayfield:CreateWindow({
    },
 })
 
--- [[ VARIABEL GLOBAL ASLI & BARU ]]
+-- [[ VARIABEL GLOBAL ]]
 _G.AutoClaim = true 
 _G.StopClaiming = false 
 
--- Variabel Auto Travel (Dipisah jadi 2)
+-- Variabel Auto Travel (Dipisah jadi 2 untuk Trade dan Main)
 _G.AutoTravelTrade = true
 _G.TravelDelayTrade = 900
 _G.AutoTravelMain = false
@@ -71,7 +71,7 @@ end
 TabClaim:CreateToggle({
    Name = "Auto Claim Booth",
    CurrentValue = true,
-   Flag = "Toggle_AutoClaim", -- Flag untuk menyimpan data
+   Flag = "Toggle_AutoClaim", -- Flag agar settingan tersave
    Callback = function(Value)
       _G.AutoClaim = Value
       if Value then startClaimLoop() end
@@ -87,6 +87,7 @@ startClaimLoop()
 local TabPetMerchant = Window:CreateTab("Pet Merchant", 4483362458)
 
 local antreanPetSlots = {}
+local antreanCounterPet = 0
 local isSellingPet = false
 
 TabPetMerchant:CreateButton({
@@ -109,8 +110,9 @@ TabPetMerchant:CreateButton({
 TabPetMerchant:CreateButton({
    Name = "➕ 2. Tambah Antrean Jual",
    Callback = function()
+      antreanCounterPet = antreanCounterPet + 1
       local slotData = { Items = {}, Price = 2, Delay = 5 }
-      TabPetMerchant:CreateSection("Urutan Antrean")
+      TabPetMerchant:CreateSection("Urutan Antrean #" .. antreanCounterPet)
       
       local dd = TabPetMerchant:CreateDropdown({
          Name = "Pilih Pet",
@@ -174,7 +176,7 @@ end
 TabPetMerchant:CreateToggle({
    Name = "🚀 MULAI AUTO MERCHANT PET",
    CurrentValue = false,
-   Flag = "Toggle_MerchantPet", -- Flag untuk menyimpan data
+   Flag = "Toggle_MerchantPet", -- Flag agar settingan tersave
    Callback = function(Value)
       isSellingPet = Value
       if Value then jalankanJualPet() end
@@ -187,6 +189,7 @@ TabPetMerchant:CreateToggle({
 local TabFruitMerchant = Window:CreateTab("Fruit Merchant", 4483362458)
 
 local antreanFruitSlots = {}
+local antreanCounterFruit = 0
 local isSellingFruit = false
 
 TabFruitMerchant:CreateButton({
@@ -209,8 +212,9 @@ TabFruitMerchant:CreateButton({
 TabFruitMerchant:CreateButton({
    Name = "➕ 2. Tambah Antrean Jual",
    Callback = function()
+      antreanCounterFruit = antreanCounterFruit + 1
       local slotData = { Items = {}, Price = 2, Delay = 5 }
-      TabFruitMerchant:CreateSection("Urutan Antrean Buah")
+      TabFruitMerchant:CreateSection("Urutan Antrean Buah #" .. antreanCounterFruit)
       
       local dd = TabFruitMerchant:CreateDropdown({
          Name = "Pilih Buah",
@@ -274,7 +278,7 @@ end
 TabFruitMerchant:CreateToggle({
    Name = "🚀 MULAI AUTO MERCHANT FRUIT",
    CurrentValue = false,
-   Flag = "Toggle_MerchantFruit", -- Flag untuk menyimpan data
+   Flag = "Toggle_MerchantFruit", -- Flag agar settingan tersave
    Callback = function(Value)
       isSellingFruit = Value
       if Value then jalankanJualFruit() end
@@ -301,6 +305,7 @@ TabTeleport:CreateButton({
    end,
 })
 
+-- Bagian Auto Travel Trade World
 TabTeleport:CreateSection("Auto Travel: Trade World")
 
 TabTeleport:CreateToggle({
@@ -320,6 +325,7 @@ TabTeleport:CreateInput({
    end,
 })
 
+-- Bagian Auto Travel Main World
 TabTeleport:CreateSection("Auto Travel: Main World")
 
 TabTeleport:CreateToggle({
