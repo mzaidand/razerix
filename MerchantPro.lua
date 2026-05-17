@@ -5,7 +5,7 @@ local Window = Rayfield:CreateWindow({
    LoadingTitle = "Menyiapkan Akses Dunia...",
    LoadingSubtitle = "by Zaylinho",
    ConfigurationSaving = { 
-       Enabled = true, -- Fitur Save Diaktifkan
+       Enabled = true, 
        FolderName = "ZaylinhoConfigs", 
        FileName = "MerchantProSave" 
    },
@@ -15,7 +15,7 @@ local Window = Rayfield:CreateWindow({
 _G.AutoClaim = true 
 _G.StopClaiming = false 
 
--- Variabel Auto Travel (Dipisah)
+-- Variabel Auto Travel
 _G.AutoTravelTrade = true
 _G.TravelDelayTrade = 900
 _G.AutoTravelMain = false
@@ -26,6 +26,12 @@ _G.AutoRejoin = false
 _G.RejoinDelay = 900
 _G.AutoTeleportBooth = false
 _G.TeleportBoothDelay = 10
+
+-- Variabel Auto Sprinkler
+_G.AutoSprinkler = false
+_G.SprinklerDelay = 300 
+_G.SelectedSprinklers = {}
+local lastSprinklerTick = {} -- DATABASE TIMER INDIVIDUAL BARU
 
 local lastTravelTrade = tick()
 local lastTravelMain = tick()
@@ -38,16 +44,13 @@ local listPetBawaan = {}
 local listFruitBawaan = {}
 
 -- ==========================================
--- TAB: SMART CLAIM (LOGIKA KODE LAMA)
+-- TAB: SMART CLAIM
 -- ==========================================
 local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 
--- Fungsi untuk mendeteksi notifikasi "You already have a booth"
 local function setupDetection()
-    -- Mendeteksi UI baru yang muncul di layar
     player.PlayerGui.DescendantAdded:Connect(function(obj)
         if obj:IsA("TextLabel") or obj:IsA("TextBox") then
-            -- Cek apakah teksnya mengandung kata kunci dari gambar
             if string.find(string.lower(obj.Text), "already have a booth") then
                 _G.StopClaiming = true
                 Rayfield:Notify({Title = "Sistem", Content = "Booth sudah didapat! Berhenti spam.", Duration = 5})
@@ -60,24 +63,22 @@ local function startClaimLoop()
     _G.StopClaiming = false
     task.spawn(function()
         while _G.AutoClaim do
-            -- Jika detektor sudah menemukan teks "Already have a booth", loop berhenti menembak server
             if not _G.StopClaiming then
                 local boothFolder = workspace:FindFirstChild("TradeWorld") and workspace.TradeWorld:FindFirstChild("Booths")
                 if boothFolder then
                     for _, booth in pairs(boothFolder:GetChildren()) do
                         if _G.StopClaiming or not _G.AutoClaim then break end
                         
-                        -- Cek apakah booth kosong
                         if not booth:GetAttribute("Owner") or booth:GetAttribute("Owner") == 0 then
                             pcall(function()
                                 game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.ClaimBooth:FireServer(booth)
                             end)
-                            task.wait(0.1) -- Delay tipis saat mencari
+                            task.wait(0.1) 
                         end
                     end
                 end
             end
-            task.wait(1) -- Cek status setiap detik
+            task.wait(1) 
         end
     end)
 end
@@ -85,7 +86,7 @@ end
 TabClaim:CreateToggle({
    Name = "Auto Claim Booth (Anti-Spam)",
    CurrentValue = true,
-   Flag = "Toggle_AutoClaim", -- Flag agar settingan tersave otomatis
+   Flag = "Toggle_AutoClaim", 
    Callback = function(Value)
       _G.AutoClaim = Value
       if Value then startClaimLoop() end
@@ -95,13 +96,170 @@ TabClaim:CreateToggle({
 TabClaim:CreateButton({
    Name = "Equip Skin: Default",
    Callback = function()
-      game:GetService("ReplicatedStorage").GameEvents.TradeBoothSkinService.Equip:FireServer("Default")
+      pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeBoothSkinService.Equip:FireServer("Default") end)
    end,
 })
 
--- Jalankan sistem deteksi dan loop
 setupDetection()
 startClaimLoop()
+
+-- ==========================================
+-- TAB: AUTO SPRINKLER (INDIVIDUAL TIMER)
+-- ==========================================
+local TabSprinkler = Window:CreateTab("Auto Sprinkler", 4483362458)
+
+local listSprinkler = {"Basic Sprinkler", "Advanced Sprinkler", "Godly Sprinkler", "Master Sprinkler", "Grandmaster Sprinkler"}
+
+TabSprinkler:CreateDropdown({
+   Name = "Pilih Jenis Sprinkler",
+   Options = listSprinkler,
+   CurrentOption = {},
+   MultipleOptions = true,
+   Flag = "Dropdown_Sprinkler", 
+   Callback = function(Options)
+      _G.SelectedSprinklers = Options
+      -- Reset timer jika ada perubahan agar langsung naruh ulang
+      lastSprinklerTick = {}
+   end,
+})
+
+local function jalankanAutoSprinkler()
+    task.spawn(function()
+        while _G.AutoSprinkler do
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local backpack = player:FindFirstChild("Backpack")
+
+            if hrp and backpack and #_G.SelectedSprinklers > 0 then
+                local currentTick = tick()
+                local dipasangSekarang = {}
+                local placeCFrame = nil -- Dihitung sekali saja kalau ada yang butuh ditanam
+
+                for _, namaDicari in ipairs(_G.SelectedSprinklers) do
+                    if not _G.AutoSprinkler then break end
+
+                    -- Tentukan delay spesifik untuk item ini
+                    local thisDelay = _G.SprinklerDelay
+                    if string.find(namaDicari, "Master") or string.find(namaDicari, "Grandmaster") then
+                        thisDelay = 600
+                    elseif string.find(namaDicari, "Basic") or string.find(namaDicari, "Advanced") or string.find(namaDicari, "Godly") then
+                        thisDelay = 300
+                    end
+
+                    local lastTick = lastSprinklerTick[namaDicari] or 0
+
+                    -- Cek apakah sudah waktunya (atau belum pernah dipasang sama sekali)
+                    if currentTick - lastTick >= thisDelay or lastTick == 0 then
+                        
+                        local sprinklerToUse = nil
+                        
+                        -- Cari barangnya
+                        for _, item in pairs(backpack:GetChildren()) do
+                            local namaAsli = item.Name
+                            local namaAtribut = tostring(item:GetAttribute("f") or "")
+                            if string.find(namaAsli, namaDicari) or string.find(namaAtribut, namaDicari) then
+                                sprinklerToUse = item
+                                break
+                            end
+                        end
+                        if not sprinklerToUse then
+                            for _, item in pairs(char:GetChildren()) do
+                                local namaAsli = item.Name
+                                local namaAtribut = tostring(item:GetAttribute("f") or "")
+                                if string.find(namaAsli, namaDicari) or string.find(namaAtribut, namaDicari) then
+                                    sprinklerToUse = item
+                                    break
+                                end
+                            end
+                        end
+
+                        -- Kalau stoknya ada, pasang!
+                        if sprinklerToUse then
+                            -- Hitung koordinat (Raycast) hanya jika belum dihitung di loop ini
+                            if not placeCFrame then
+                                local rayParams = RaycastParams.new()
+                                rayParams.FilterDescendantsInstances = {char}
+                                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+                                local rayResult = workspace:Raycast(hrp.Position, Vector3.new(0, -15, 0), rayParams)
+                                if rayResult then
+                                    placeCFrame = CFrame.new(rayResult.Position)
+                                else
+                                    placeCFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 2.5, hrp.Position.Z)
+                                end
+                            end
+
+                            pcall(function()
+                                local humanoid = char:FindFirstChild("Humanoid")
+                                if humanoid and sprinklerToUse.Parent == backpack then
+                                    humanoid:EquipTool(sprinklerToUse)
+                                    task.wait(0.3)
+                                end
+
+                                game:GetService("ReplicatedStorage").GameEvents.SprinklerService:FireServer("Create", placeCFrame)
+
+                                local inputChar = char:FindFirstChild("InputGateway")
+                                local inputScript = player:FindFirstChild("PlayerScripts") and player.PlayerScripts:FindFirstChild("InputGateway")
+
+                                if inputChar and inputChar:FindFirstChild("Activation") then
+                                    inputChar.Activation:FireServer(true, placeCFrame)
+                                    task.wait(0.1)
+                                    inputChar.Activation:FireServer(false, placeCFrame)
+                                end
+
+                                if inputScript and inputScript:FindFirstChild("Activation") then
+                                    inputScript.Activation:FireServer(true, placeCFrame)
+                                    task.wait(0.1)
+                                    inputScript.Activation:FireServer(false, placeCFrame)
+                                end
+                            end)
+
+                            -- Catat waktu penanaman untuk jenis ini
+                            lastSprinklerTick[namaDicari] = tick()
+                            table.insert(dipasangSekarang, namaDicari)
+                            task.wait(0.5) -- Jeda animasi antar sprinkler
+                        end
+                    end
+                end
+
+                if #dipasangSekarang > 0 then
+                    local namaGabungan = table.concat(dipasangSekarang, ", ")
+                    Rayfield:Notify({
+                        Title = "Auto Sprinkler", 
+                        Content = "Berhasil menaruh: " .. namaGabungan, 
+                        Duration = 4
+                    })
+                end
+            end
+            
+            -- Loop akan mengecek setiap 5 detik (Tidak bikin server berat, dan sangat responsif)
+            task.wait(5)
+        end
+    end)
+end
+
+TabSprinkler:CreateToggle({
+   Name = "🚀 MULAI AUTO SPRINKLER",
+   CurrentValue = false,
+   Flag = "Toggle_AutoSprinkler",
+   Callback = function(Value)
+      _G.AutoSprinkler = Value
+      if Value then 
+          lastSprinklerTick = {} -- Reset timer saat dinyalakan
+          jalankanAutoSprinkler() 
+      end
+   end,
+})
+
+TabSprinkler:CreateInput({
+   Name = "Jeda Fallback/Lainnya (Detik)",
+   PlaceholderText = "300",
+   NumbersOnly = true,
+   Flag = "Input_SprinklerDelay",
+   Callback = function(Text)
+      _G.SprinklerDelay = tonumber(Text) or 300
+   end
+})
 
 -- ==========================================
 -- TAB: PET MERCHANT
@@ -198,7 +356,7 @@ end
 TabPetMerchant:CreateToggle({
    Name = "🚀 MULAI AUTO MERCHANT PET",
    CurrentValue = false,
-   Flag = "Toggle_MerchantPet", -- Flag Save
+   Flag = "Toggle_MerchantPet", 
    Callback = function(Value)
       isSellingPet = Value
       if Value then jalankanJualPet() end
@@ -300,7 +458,7 @@ end
 TabFruitMerchant:CreateToggle({
    Name = "🚀 MULAI AUTO MERCHANT FRUIT",
    CurrentValue = false,
-   Flag = "Toggle_MerchantFruit", -- Flag Save
+   Flag = "Toggle_MerchantFruit",
    Callback = function(Value)
       isSellingFruit = Value
       if Value then jalankanJualFruit() end
@@ -312,29 +470,21 @@ TabFruitMerchant:CreateToggle({
 -- ==========================================
 local TabTeleport = Window:CreateTab("Teleport", 4483362458)
 
--- Tombol Manual
 TabTeleport:CreateButton({
    Name = "TRAVEL TO TRADE WORLD",
-   Callback = function()
-      pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer() end)
-   end,
+   Callback = function() pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer() end) end,
 })
 
 TabTeleport:CreateButton({
    Name = "TRAVEL TO MAIN WORLD",
-   Callback = function()
-      pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer() end)
-   end,
+   Callback = function() pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer() end) end,
 })
 
 TabTeleport:CreateButton({
    Name = "TELEPORT TO BOOTH AREA",
-   Callback = function()
-      pcall(function() game:GetService("ReplicatedStorage").GameEvents.PlayerTeleportTriggered:FireServer("Booth") end)
-   end,
+   Callback = function() pcall(function() game:GetService("ReplicatedStorage").GameEvents.PlayerTeleportTriggered:FireServer("Booth") end) end,
 })
 
--- Bagian Server Management 
 TabTeleport:CreateSection("Server Management")
 
 TabTeleport:CreateButton({
@@ -344,16 +494,14 @@ TabTeleport:CreateButton({
       task.wait(1) 
       local ts = game:GetService("TeleportService")
       local p = game:GetService("Players").LocalPlayer
-      pcall(function()
-          ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, p)
-      end)
+      pcall(function() ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, p) end)
    end,
 })
 
 TabTeleport:CreateToggle({
    Name = "Auto Rejoin (Repeat)",
    CurrentValue = false,
-   Flag = "Toggle_AutoRejoin", -- Flag Save
+   Flag = "Toggle_AutoRejoin", 
    Callback = function(Value) _G.AutoRejoin = Value end,
 })
 
@@ -361,19 +509,16 @@ TabTeleport:CreateInput({
    Name = "Rejoin Delay (Seconds)",
    PlaceholderText = "900",
    NumbersOnly = true,
-   Flag = "Input_DelayRejoin", -- Flag Save
-   Callback = function(Text)
-      _G.RejoinDelay = tonumber(Text) or 900
-   end,
+   Flag = "Input_DelayRejoin",
+   Callback = function(Text) _G.RejoinDelay = tonumber(Text) or 900 end,
 })
 
--- Bagian Auto Travel Trade World
 TabTeleport:CreateSection("Auto Travel: Trade World")
 
 TabTeleport:CreateToggle({
    Name = "Auto Travel (Trade World)",
    CurrentValue = true,
-   Flag = "Toggle_TravelTrade", -- Flag Save
+   Flag = "Toggle_TravelTrade",
    Callback = function(Value) _G.AutoTravelTrade = Value end,
 })
 
@@ -381,19 +526,16 @@ TabTeleport:CreateInput({
    Name = "Delay Trade World (Seconds)",
    PlaceholderText = "900",
    NumbersOnly = true,
-   Flag = "Input_DelayTrade", -- Flag Save
-   Callback = function(Text)
-      _G.TravelDelayTrade = tonumber(Text) or 900
-   end,
+   Flag = "Input_DelayTrade",
+   Callback = function(Text) _G.TravelDelayTrade = tonumber(Text) or 900 end,
 })
 
--- Bagian Auto Travel Main World
 TabTeleport:CreateSection("Auto Travel: Main World")
 
 TabTeleport:CreateToggle({
    Name = "Auto Travel (Main World)",
    CurrentValue = false,
-   Flag = "Toggle_TravelMain", -- Flag Save
+   Flag = "Toggle_TravelMain",
    Callback = function(Value) _G.AutoTravelMain = Value end,
 })
 
@@ -401,19 +543,16 @@ TabTeleport:CreateInput({
    Name = "Delay Main World (Seconds)",
    PlaceholderText = "900",
    NumbersOnly = true,
-   Flag = "Input_DelayMain", -- Flag Save
-   Callback = function(Text)
-      _G.TravelDelayMain = tonumber(Text) or 900
-   end
+   Flag = "Input_DelayMain",
+   Callback = function(Text) _G.TravelDelayMain = tonumber(Text) or 900 end
 })
 
--- Bagian Auto Teleport Booth Area
 TabTeleport:CreateSection("Auto Travel: Booth Area")
 
 TabTeleport:CreateToggle({
    Name = "Auto Teleport (Booth Area)",
    CurrentValue = false,
-   Flag = "Toggle_TeleportBooth", -- Flag Save
+   Flag = "Toggle_TeleportBooth",
    Callback = function(Value) _G.AutoTeleportBooth = Value end,
 })
 
@@ -421,35 +560,26 @@ TabTeleport:CreateInput({
    Name = "Delay Teleport Booth (Seconds)",
    PlaceholderText = "10",
    NumbersOnly = true,
-   Flag = "Input_DelayTeleportBooth", -- Flag Save
-   Callback = function(Text)
-      _G.TeleportBoothDelay = tonumber(Text) or 10
-   end
+   Flag = "Input_DelayTeleportBooth",
+   Callback = function(Text) _G.TeleportBoothDelay = tonumber(Text) or 10 end
 })
 
--- [[ LOGIKA BACKGROUND (DIPISAH EMPAT TIMER) ]]
+-- [[ LOGIKA BACKGROUND ]]
 task.spawn(function()
     while true do
         task.wait(1)
         local currentTick = tick()
         
-        -- Timer Trade World
         if _G.AutoTravelTrade and currentTick - lastTravelTrade >= _G.TravelDelayTrade then
-            pcall(function()
-               game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer()
-            end)
+            pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer() end)
             lastTravelTrade = tick()
         end
         
-        -- Timer Main World
         if _G.AutoTravelMain and currentTick - lastTravelMain >= _G.TravelDelayMain then
-            pcall(function()
-               game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer()
-            end)
+            pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer() end)
             lastTravelMain = tick()
         end
 
-        -- Timer Auto Rejoin
         if _G.AutoRejoin and currentTick - lastRejoin >= _G.RejoinDelay then
             pcall(function()
                 local ts = game:GetService("TeleportService")
@@ -459,11 +589,8 @@ task.spawn(function()
             lastRejoin = tick()
         end
         
-        -- Timer Auto Teleport Booth
         if _G.AutoTeleportBooth and currentTick - lastTeleportBooth >= _G.TeleportBoothDelay then
-            pcall(function()
-                game:GetService("ReplicatedStorage").GameEvents.PlayerTeleportTriggered:FireServer("Booth")
-            end)
+            pcall(function() game:GetService("ReplicatedStorage").GameEvents.PlayerTeleportTriggered:FireServer("Booth") end)
             lastTeleportBooth = tick()
         end
     end
@@ -477,7 +604,4 @@ player.Idled:Connect(function()
     vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- ==========================================
--- LOAD KONFIGURASI YANG TERSIMPAN
--- ==========================================
 Rayfield:LoadConfiguration()
