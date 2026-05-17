@@ -15,19 +15,22 @@ local Window = Rayfield:CreateWindow({
 _G.AutoClaim = true 
 _G.StopClaiming = false 
 
--- Variabel Auto Travel (Dipisah jadi 2 untuk Trade dan Main)
+-- Variabel Auto Travel (Dipisah)
 _G.AutoTravelTrade = true
 _G.TravelDelayTrade = 900
 _G.AutoTravelMain = false
 _G.TravelDelayMain = 900
 
--- Variabel Auto Rejoin Baru
+-- Variabel Auto Rejoin & Teleport Booth
 _G.AutoRejoin = false
 _G.RejoinDelay = 900
+_G.AutoTeleportBooth = false
+_G.TeleportBoothDelay = 10
 
 local lastTravelTrade = tick()
 local lastTravelMain = tick()
 local lastRejoin = tick()
+local lastTeleportBooth = tick()
 local player = game.Players.LocalPlayer
 
 -- Database Inventory
@@ -35,17 +38,19 @@ local listPetBawaan = {}
 local listFruitBawaan = {}
 
 -- ==========================================
--- TAB: SMART CLAIM (LOGIKA TERBARU: SPAM SAMPAI DAPAT)
+-- TAB: SMART CLAIM (LOGIKA KODE LAMA)
 -- ==========================================
 local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 
+-- Fungsi untuk mendeteksi notifikasi "You already have a booth"
 local function setupDetection()
+    -- Mendeteksi UI baru yang muncul di layar
     player.PlayerGui.DescendantAdded:Connect(function(obj)
         if obj:IsA("TextLabel") or obj:IsA("TextBox") then
-            -- Deteksi sukses
+            -- Cek apakah teksnya mengandung kata kunci dari gambar
             if string.find(string.lower(obj.Text), "already have a booth") then
                 _G.StopClaiming = true
-                Rayfield:Notify({Title = "Sistem", Content = "Booth berhasil didapat!", Duration = 5})
+                Rayfield:Notify({Title = "Sistem", Content = "Booth sudah didapat! Berhenti spam.", Duration = 5})
             end
         end
     end)
@@ -55,68 +60,46 @@ local function startClaimLoop()
     _G.StopClaiming = false
     task.spawn(function()
         while _G.AutoClaim do
+            -- Jika detektor sudah menemukan teks "Already have a booth", loop berhenti menembak server
             if not _G.StopClaiming then
-                local char = player.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 local boothFolder = workspace:FindFirstChild("TradeWorld") and workspace.TradeWorld:FindFirstChild("Booths")
-                
-                if hrp and boothFolder then
-                    -- 1. Teleport ke Area Booth
-                    pcall(function()
-                        game:GetService("ReplicatedStorage").GameEvents.PlayerTeleportTriggered:FireServer("Booth")
-                    end)
-                    
-                    task.wait(0.5) -- Tunggu mendarat
-                    
-                    -- 2. Kumpulkan semua booth kosong dan urutkan berdasarkan jarak
-                    local boothKosong = {}
+                if boothFolder then
                     for _, booth in pairs(boothFolder:GetChildren()) do
-                        if not _G.AutoClaim or _G.StopClaiming then break end
-                        
-                        -- Cek apakah atribut owner kosong
-                        if not booth:GetAttribute("Owner") or booth:GetAttribute("Owner") == 0 then
-                            local boothPos = booth:GetPivot().Position
-                            local jarak = (hrp.Position - boothPos).Magnitude
-                            table.insert(boothKosong, {booth = booth, jarak = jarak})
-                        end
-                    end
-                    
-                    -- Urutkan dari yang terdekat ke terjauh
-                    table.sort(boothKosong, function(a, b)
-                        return a.jarak < b.jarak
-                    end)
-                    
-                    -- 3. Coba claim satu per satu dari yang terdekat
-                    for _, data in ipairs(boothKosong) do
                         if _G.StopClaiming or not _G.AutoClaim then break end
                         
-                        -- Pengecekan ekstra: Pastikan masih kosong sebelum ditembak
-                        if not data.booth:GetAttribute("Owner") or data.booth:GetAttribute("Owner") == 0 then
+                        -- Cek apakah booth kosong
+                        if not booth:GetAttribute("Owner") or booth:GetAttribute("Owner") == 0 then
                             pcall(function()
-                                game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.ClaimBooth:FireServer(data.booth)
+                                game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.ClaimBooth:FireServer(booth)
                             end)
-                            
-                            -- Beri jeda kecil agar server bisa merespon sebelum mencoba booth berikutnya
-                            task.wait(0.3) 
+                            task.wait(0.1) -- Delay tipis saat mencari
                         end
                     end
                 end
             end
-            task.wait(1.5) -- Jeda antar siklus pencarian
+            task.wait(1) -- Cek status setiap detik
         end
     end)
 end
 
 TabClaim:CreateToggle({
-   Name = "Auto Claim Booth",
+   Name = "Auto Claim Booth (Anti-Spam)",
    CurrentValue = true,
-   Flag = "Toggle_AutoClaim", -- Flag agar settingan tersave
+   Flag = "Toggle_AutoClaim", -- Flag agar settingan tersave otomatis
    Callback = function(Value)
       _G.AutoClaim = Value
       if Value then startClaimLoop() end
    end,
 })
 
+TabClaim:CreateButton({
+   Name = "Equip Skin: Default",
+   Callback = function()
+      game:GetService("ReplicatedStorage").GameEvents.TradeBoothSkinService.Equip:FireServer("Default")
+   end,
+})
+
+-- Jalankan sistem deteksi dan loop
 setupDetection()
 startClaimLoop()
 
@@ -215,7 +198,7 @@ end
 TabPetMerchant:CreateToggle({
    Name = "🚀 MULAI AUTO MERCHANT PET",
    CurrentValue = false,
-   Flag = "Toggle_MerchantPet", -- Flag agar settingan tersave
+   Flag = "Toggle_MerchantPet", -- Flag Save
    Callback = function(Value)
       isSellingPet = Value
       if Value then jalankanJualPet() end
@@ -317,7 +300,7 @@ end
 TabFruitMerchant:CreateToggle({
    Name = "🚀 MULAI AUTO MERCHANT FRUIT",
    CurrentValue = false,
-   Flag = "Toggle_MerchantFruit", -- Flag agar settingan tersave
+   Flag = "Toggle_MerchantFruit", -- Flag Save
    Callback = function(Value)
       isSellingFruit = Value
       if Value then jalankanJualFruit() end
@@ -341,6 +324,13 @@ TabTeleport:CreateButton({
    Name = "TRAVEL TO MAIN WORLD",
    Callback = function()
       pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer() end)
+   end,
+})
+
+TabTeleport:CreateButton({
+   Name = "TELEPORT TO BOOTH AREA",
+   Callback = function()
+      pcall(function() game:GetService("ReplicatedStorage").GameEvents.PlayerTeleportTriggered:FireServer("Booth") end)
    end,
 })
 
@@ -417,7 +407,27 @@ TabTeleport:CreateInput({
    end
 })
 
--- [[ LOGIKA BACKGROUND ]]
+-- Bagian Auto Teleport Booth Area
+TabTeleport:CreateSection("Auto Travel: Booth Area")
+
+TabTeleport:CreateToggle({
+   Name = "Auto Teleport (Booth Area)",
+   CurrentValue = false,
+   Flag = "Toggle_TeleportBooth", -- Flag Save
+   Callback = function(Value) _G.AutoTeleportBooth = Value end,
+})
+
+TabTeleport:CreateInput({
+   Name = "Delay Teleport Booth (Seconds)",
+   PlaceholderText = "10",
+   NumbersOnly = true,
+   Flag = "Input_DelayTeleportBooth", -- Flag Save
+   Callback = function(Text)
+      _G.TeleportBoothDelay = tonumber(Text) or 10
+   end
+})
+
+-- [[ LOGIKA BACKGROUND (DIPISAH EMPAT TIMER) ]]
 task.spawn(function()
     while true do
         task.wait(1)
@@ -447,6 +457,14 @@ task.spawn(function()
                 ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, p)
             end)
             lastRejoin = tick()
+        end
+        
+        -- Timer Auto Teleport Booth
+        if _G.AutoTeleportBooth and currentTick - lastTeleportBooth >= _G.TeleportBoothDelay then
+            pcall(function()
+                game:GetService("ReplicatedStorage").GameEvents.PlayerTeleportTriggered:FireServer("Booth")
+            end)
+            lastTeleportBooth = tick()
         end
     end
 end)
