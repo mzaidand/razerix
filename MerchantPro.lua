@@ -4,15 +4,25 @@ local Window = Rayfield:CreateWindow({
    Name = "Zaylinho World Teleport",
    LoadingTitle = "Menyiapkan Akses Dunia...",
    LoadingSubtitle = "by Zaylinho",
-   ConfigurationSaving = { Enabled = false },
+   ConfigurationSaving = { 
+       Enabled = true, -- Fitur Save Diaktifkan
+       FolderName = "ZaylinhoConfigs", 
+       FileName = "MerchantProSave" 
+   },
 })
 
--- [[ VARIABEL GLOBAL ASLI ]]
-_G.AutoTravel = true
-_G.TravelDelay = 900 
+-- [[ VARIABEL GLOBAL ASLI & BARU ]]
 _G.AutoClaim = true 
 _G.StopClaiming = false 
-local lastTravel = tick()
+
+-- Variabel Auto Travel (Dipisah jadi 2)
+_G.AutoTravelTrade = true
+_G.TravelDelayTrade = 900
+_G.AutoTravelMain = false
+_G.TravelDelayMain = 900
+
+local lastTravelTrade = tick()
+local lastTravelMain = tick()
 local player = game.Players.LocalPlayer
 
 -- Database Inventory
@@ -20,7 +30,7 @@ local listPetBawaan = {}
 local listFruitBawaan = {}
 
 -- ==========================================
--- TAB: SMART CLAIM (TETAP ASLI)
+-- TAB: SMART CLAIM
 -- ==========================================
 local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 
@@ -61,6 +71,7 @@ end
 TabClaim:CreateToggle({
    Name = "Auto Claim Booth",
    CurrentValue = true,
+   Flag = "Toggle_AutoClaim", -- Flag untuk menyimpan data
    Callback = function(Value)
       _G.AutoClaim = Value
       if Value then startClaimLoop() end
@@ -71,7 +82,7 @@ setupDetection()
 startClaimLoop()
 
 -- ==========================================
--- TAB: PET MERCHANT (TETAP ASLI)
+-- TAB: PET MERCHANT
 -- ==========================================
 local TabPetMerchant = Window:CreateTab("Pet Merchant", 4483362458)
 
@@ -163,6 +174,7 @@ end
 TabPetMerchant:CreateToggle({
    Name = "🚀 MULAI AUTO MERCHANT PET",
    CurrentValue = false,
+   Flag = "Toggle_MerchantPet", -- Flag untuk menyimpan data
    Callback = function(Value)
       isSellingPet = Value
       if Value then jalankanJualPet() end
@@ -170,7 +182,7 @@ TabPetMerchant:CreateToggle({
 })
 
 -- ==========================================
--- TAB: FRUIT MERCHANT (FIXED LOGIC)
+-- TAB: FRUIT MERCHANT
 -- ==========================================
 local TabFruitMerchant = Window:CreateTab("Fruit Merchant", 4483362458)
 
@@ -184,8 +196,6 @@ TabFruitMerchant:CreateButton({
       local backpack = player:FindFirstChild("Backpack")
       if backpack then
          for _, item in pairs(backpack:GetChildren()) do
-            -- Berdasarkan Dex & SimpleSpy, buah (Bone Blossom) pakai atribut 'c'
-            -- dan tipenya bukan Pet.
             if item:GetAttribute("c") and not item:GetAttribute("PET_UUID") then
                if not table.find(temp, item.Name) then table.insert(temp, item.Name) end
             end
@@ -215,7 +225,7 @@ TabFruitMerchant:CreateButton({
          PlaceholderText = "Ketik nama buah...",
          Callback = function(Text)
             if Text == "" then
-                dd:Refresh(listFruitBawaan, true) -- Tampilkan semua jika kosong
+                dd:Refresh(listFruitBawaan, true) 
             else
                 local query = string.lower(Text)
                 local filtered = {}
@@ -244,10 +254,9 @@ local function jalankanJualFruit()
                     if bp then
                         for _, item in pairs(bp:GetChildren()) do
                             if item.Name == fruitName and isSellingFruit then
-                                local uuid = item:GetAttribute("c") -- UUID di atribut 'c'
+                                local uuid = item:GetAttribute("c") 
                                 if uuid then
                                     pcall(function()
-                                        -- FIX: Menggunakan "Holdable" sesuai SimpleSpy kamu
                                         game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(uuid), tonumber(slot.Price))
                                     end)
                                     task.wait(slot.Delay)
@@ -265,6 +274,7 @@ end
 TabFruitMerchant:CreateToggle({
    Name = "🚀 MULAI AUTO MERCHANT FRUIT",
    CurrentValue = false,
+   Flag = "Toggle_MerchantFruit", -- Flag untuk menyimpan data
    Callback = function(Value)
       isSellingFruit = Value
       if Value then jalankanJualFruit() end
@@ -272,52 +282,83 @@ TabFruitMerchant:CreateToggle({
 })
 
 -- ==========================================
--- TAB: TELEPORT (TETAP ASLI)
+-- TAB: TELEPORT (DIPISAH TRADE & MAIN)
 -- ==========================================
 local TabTeleport = Window:CreateTab("Teleport", 4483362458)
 
+-- Tombol Manual
 TabTeleport:CreateButton({
    Name = "TRAVEL TO TRADE WORLD",
    Callback = function()
-      pcall(function()
-         game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer()
-      end)
+      pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer() end)
    end,
 })
 
 TabTeleport:CreateButton({
    Name = "TRAVEL TO MAIN WORLD",
    Callback = function()
-      pcall(function()
-         game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer()
-      end)
+      pcall(function() game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer() end)
    end,
 })
 
+TabTeleport:CreateSection("Auto Travel: Trade World")
+
 TabTeleport:CreateToggle({
-   Name = "Auto Travel (Repeat)",
+   Name = "Auto Travel (Trade World)",
    CurrentValue = true,
-   Callback = function(Value) _G.AutoTravel = Value end,
+   Flag = "Toggle_TravelTrade", -- Flag Save
+   Callback = function(Value) _G.AutoTravelTrade = Value end,
 })
 
 TabTeleport:CreateInput({
-   Name = "Travel Delay (Seconds)",
+   Name = "Delay Trade World (Seconds)",
    PlaceholderText = "900",
    NumbersOnly = true,
+   Flag = "Input_DelayTrade", -- Flag Save
    Callback = function(Text)
-      _G.TravelDelay = tonumber(Text) or 900
+      _G.TravelDelayTrade = tonumber(Text) or 900
    end,
 })
 
--- [[ LOGIKA BACKGROUND ]]
+TabTeleport:CreateSection("Auto Travel: Main World")
+
+TabTeleport:CreateToggle({
+   Name = "Auto Travel (Main World)",
+   CurrentValue = false,
+   Flag = "Toggle_TravelMain", -- Flag Save
+   Callback = function(Value) _G.AutoTravelMain = Value end,
+})
+
+TabTeleport:CreateInput({
+   Name = "Delay Main World (Seconds)",
+   PlaceholderText = "900",
+   NumbersOnly = true,
+   Flag = "Input_DelayMain", -- Flag Save
+   Callback = function(Text)
+      _G.TravelDelayMain = tonumber(Text) or 900
+   end,
+})
+
+-- [[ LOGIKA BACKGROUND (DIPISAH DUA TIMER) ]]
 task.spawn(function()
     while true do
         task.wait(1)
-        if _G.AutoTravel and tick() - lastTravel >= _G.TravelDelay then
+        local currentTick = tick()
+        
+        -- Timer Trade World
+        if _G.AutoTravelTrade and currentTick - lastTravelTrade >= _G.TravelDelayTrade then
             pcall(function()
                game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToTradeWorld:FireServer()
             end)
-            lastTravel = tick()
+            lastTravelTrade = tick()
+        end
+        
+        -- Timer Main World
+        if _G.AutoTravelMain and currentTick - lastTravelMain >= _G.TravelDelayMain then
+            pcall(function()
+               game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer()
+            end)
+            lastTravelMain = tick()
         end
     end
 end)
@@ -329,3 +370,8 @@ player.Idled:Connect(function()
     task.wait(1)
     vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
+
+-- ==========================================
+-- LOAD KONFIGURASI YANG TERSIMPAN
+-- ==========================================
+Rayfield:LoadConfiguration()
