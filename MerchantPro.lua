@@ -21,8 +21,13 @@ _G.TravelDelayTrade = 900
 _G.AutoTravelMain = false
 _G.TravelDelayMain = 900
 
+-- Variabel Auto Rejoin Baru
+_G.AutoRejoin = false
+_G.RejoinDelay = 900
+
 local lastTravelTrade = tick()
 local lastTravelMain = tick()
+local lastRejoin = tick()
 local player = game.Players.LocalPlayer
 
 -- Database Inventory
@@ -52,7 +57,7 @@ local function startClaimLoop()
             if not _G.StopClaiming then
                 local boothFolder = workspace:FindFirstChild("TradeWorld") and workspace.TradeWorld:FindFirstChild("Booths")
                 if boothFolder then
-                    for _, booth in pairs(boothFolder:GetChildren()) do
+                    for _, booth in pairs(boFolder:GetChildren()) do
                         if not _G.AutoClaim or _G.StopClaiming then break end
                         if not booth:GetAttribute("Owner") or booth:GetAttribute("Owner") == 0 then
                             pcall(function()
@@ -286,7 +291,7 @@ TabFruitMerchant:CreateToggle({
 })
 
 -- ==========================================
--- TAB: TELEPORT (DIPISAH TRADE & MAIN)
+-- TAB: TELEPORT (DIPISAH TRADE, MAIN, & REJOIN)
 -- ==========================================
 local TabTeleport = Window:CreateTab("Teleport", 4483362458)
 
@@ -305,6 +310,7 @@ TabTeleport:CreateButton({
    end,
 })
 
+-- Bagian Server Management (Ditambah Fitur Auto Repeat Rejoin)
 TabTeleport:CreateSection("Server Management")
 
 TabTeleport:CreateButton({
@@ -317,6 +323,23 @@ TabTeleport:CreateButton({
       pcall(function()
           ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, p)
       end)
+   end,
+})
+
+TabTeleport:CreateToggle({
+   Name = "Auto Rejoin (Repeat)",
+   CurrentValue = false,
+   Flag = "Toggle_AutoRejoin", -- Flag Save
+   Callback = function(Value) _G.AutoRejoin = Value end,
+})
+
+TabTeleport:CreateInput({
+   Name = "Rejoin Delay (Seconds)",
+   PlaceholderText = "900",
+   NumbersOnly = true,
+   Flag = "Input_DelayRejoin", -- Flag Save
+   Callback = function(Text)
+      _G.RejoinDelay = tonumber(Text) or 900
    end,
 })
 
@@ -357,10 +380,10 @@ TabTeleport:CreateInput({
    Flag = "Input_DelayMain", -- Flag Save
    Callback = function(Text)
       _G.TravelDelayMain = tonumber(Text) or 900
-   end,
+   end
 })
 
--- [[ LOGIKA BACKGROUND (DIPISAH DUA TIMER) ]]
+-- [[ LOGIKA BACKGROUND (DIPISAH TIGA TIMER) ]]
 task.spawn(function()
     while true do
         task.wait(1)
@@ -380,6 +403,16 @@ task.spawn(function()
                game:GetService("ReplicatedStorage").GameEvents.TradeWorld.TravelToMainWorld:FireServer()
             end)
             lastTravelMain = tick()
+        end
+
+        -- Timer Auto Rejoin (Fitur Baru)
+        if _G.AutoRejoin and currentTick - lastRejoin >= _G.RejoinDelay then
+            pcall(function()
+                local ts = game:GetService("TeleportService")
+                local p = game:GetService("Players").LocalPlayer
+                ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, p)
+            end)
+            lastRejoin = tick()
         end
     end
 end)
