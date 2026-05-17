@@ -57,7 +57,8 @@ local function startClaimLoop()
             if not _G.StopClaiming then
                 local boothFolder = workspace:FindFirstChild("TradeWorld") and workspace.TradeWorld:FindFirstChild("Booths")
                 if boothFolder then
-                    for _, booth in pairs(boFolder:GetChildren()) do
+                    -- FIX: Mengubah boFolder menjadi boothFolder
+                    for _, booth in pairs(boothFolder:GetChildren()) do
                         if not _G.AutoClaim or _G.StopClaiming then break end
                         if not booth:GetAttribute("Owner") or booth:GetAttribute("Owner") == 0 then
                             pcall(function()
@@ -405,7 +406,7 @@ task.spawn(function()
             lastTravelMain = tick()
         end
 
-        -- Timer Auto Rejoin (Fitur Baru)
+        -- Timer Auto Rejoin
         if _G.AutoRejoin and currentTick - lastRejoin >= _G.RejoinDelay then
             pcall(function()
                 local ts = game:GetService("TeleportService")
