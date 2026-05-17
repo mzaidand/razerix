@@ -305,6 +305,21 @@ TabTeleport:CreateButton({
    end,
 })
 
+TabTeleport:CreateSection("Server Management")
+
+TabTeleport:CreateButton({
+   Name = "🔄 REJOIN SERVER INI",
+   Callback = function()
+      Rayfield:Notify({Title = "Sistem", Content = "Mencoba rejoin ke server yang sama...", Duration = 3})
+      task.wait(1) 
+      local ts = game:GetService("TeleportService")
+      local p = game:GetService("Players").LocalPlayer
+      pcall(function()
+          ts:TeleportToPlaceInstance(game.PlaceId, game.JobId, p)
+      end)
+   end,
+})
+
 -- Bagian Auto Travel Trade World
 TabTeleport:CreateSection("Auto Travel: Trade World")
 
