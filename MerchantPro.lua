@@ -35,7 +35,7 @@ local listPetBawaan = {}
 local listFruitBawaan = {}
 
 -- ==========================================
--- TAB: SMART CLAIM
+-- TAB: SMART CLAIM (LOGIKA TERBARU: TELEPORT & CARI TERDEKAT)
 -- ==========================================
 local TabClaim = Window:CreateTab("Smart Claim", 4483362458)
 
@@ -44,7 +44,7 @@ local function setupDetection()
         if obj:IsA("TextLabel") or obj:IsA("TextBox") then
             if string.find(string.lower(obj.Text), "already have a booth") then
                 _G.StopClaiming = true
-                Rayfield:Notify({Title = "Sistem", Content = "Booth didapat!", Duration = 5})
+                Rayfield:Notify({Title = "Sistem", Content = "Booth berhasil didapat!", Duration = 5})
             end
         end
     end)
@@ -55,21 +55,47 @@ local function startClaimLoop()
     task.spawn(function()
         while _G.AutoClaim do
             if not _G.StopClaiming then
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 local boothFolder = workspace:FindFirstChild("TradeWorld") and workspace.TradeWorld:FindFirstChild("Booths")
-                if boothFolder then
-                    -- FIX: Mengubah boFolder menjadi boothFolder
+                
+                if hrp and boothFolder then
+                    -- 1. Teleport ke Area Booth (Sesuai SimpleSpy)
+                    pcall(function()
+                        game:GetService("ReplicatedStorage").GameEvents.PlayerTeleportTriggered:FireServer("Booth")
+                    end)
+                    
+                    task.wait(0.5) -- Tunggu setengah detik agar karakter sampai di lokasi
+                    
+                    -- 2. Cari Booth Kosong Terdekat
+                    local boothTerdekat = nil
+                    local jarakTerkecil = math.huge -- Set nilai awal jarak sebesar mungkin
+                    
                     for _, booth in pairs(boothFolder:GetChildren()) do
                         if not _G.AutoClaim or _G.StopClaiming then break end
+                        
+                        -- Cek apakah booth kosong
                         if not booth:GetAttribute("Owner") or booth:GetAttribute("Owner") == 0 then
-                            pcall(function()
-                                game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.ClaimBooth:FireServer(booth)
-                            end)
-                            task.wait(0.1)
+                            -- Hitung jarak dari badan karakter ke booth
+                            local boothPos = booth:GetPivot().Position
+                            local jarak = (hrp.Position - boothPos).Magnitude
+                            
+                            if jarak < jarakTerkecil then
+                                jarakTerkecil = jarak
+                                boothTerdekat = booth
+                            end
                         end
+                    end
+                    
+                    -- 3. Claim Booth yang Paling Dekat
+                    if boothTerdekat and not _G.StopClaiming then
+                        pcall(function()
+                            game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.ClaimBooth:FireServer(boothTerdekat)
+                        end)
                     end
                 end
             end
-            task.wait(1)
+            task.wait(1.5) -- Jeda loop agar tidak ngespam teleport
         end
     end)
 end
@@ -292,7 +318,7 @@ TabFruitMerchant:CreateToggle({
 })
 
 -- ==========================================
--- TAB: TELEPORT (DIPISAH TRADE, MAIN, & REJOIN)
+-- TAB: TELEPORT 
 -- ==========================================
 local TabTeleport = Window:CreateTab("Teleport", 4483362458)
 
@@ -311,7 +337,7 @@ TabTeleport:CreateButton({
    end,
 })
 
--- Bagian Server Management (Ditambah Fitur Auto Repeat Rejoin)
+-- Bagian Server Management 
 TabTeleport:CreateSection("Server Management")
 
 TabTeleport:CreateButton({
@@ -384,7 +410,7 @@ TabTeleport:CreateInput({
    end
 })
 
--- [[ LOGIKA BACKGROUND (DIPISAH TIGA TIMER) ]]
+-- [[ LOGIKA BACKGROUND ]]
 task.spawn(function()
     while true do
         task.wait(1)
