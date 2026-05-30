@@ -33,10 +33,8 @@ _G.SprinklerDelay = 300
 _G.SelectedSprinklers = {}
 local lastSprinklerTick = {} -- DATABASE TIMER INDIVIDUAL BARU
 
--- Variabel Auto Input Fruit (Fitur Baru)
-_G.AutoFruitName = ""
-_G.AutoFruitPrice = 3
-_G.AutoFruitDelay = 5
+-- Variabel Merchant Tambahan
+_G.HargaJual = 2 -- Default harga untuk Bone Blossom
 
 local lastTravelTrade = tick()
 local lastTravelMain = tick()
@@ -61,7 +59,7 @@ local function setupDetection()
                 Rayfield:Notify({Title = "Sistem", Content = "Booth sudah didapat! Berhenti spam.", Duration = 5})
             end
         end
-    end)
+    end
 end
 
 local function startClaimLoop()
@@ -123,7 +121,6 @@ TabSprinkler:CreateDropdown({
    Flag = "Dropdown_Sprinkler", 
    Callback = function(Options)
       _G.SelectedSprinklers = Options
-      -- Reset timer jika ada perubahan agar langsung naruh ulang
       lastSprinklerTick = {}
    end,
 })
@@ -138,12 +135,11 @@ local function jalankanAutoSprinkler()
             if hrp and backpack and #_G.SelectedSprinklers > 0 then
                 local currentTick = tick()
                 local dipasangSekarang = {}
-                local placeCFrame = nil -- Dihitung sekali saja kalau ada yang butuh ditanam
+                local placeCFrame = nil 
 
                 for _, namaDicari in ipairs(_G.SelectedSprinklers) do
                     if not _G.AutoSprinkler then break end
 
-                    -- Tentukan delay spesifik untuk item ini
                     local thisDelay = _G.SprinklerDelay
                     if string.find(namaDicari, "Master") or string.find(namaDicari, "Grandmaster") then
                         thisDelay = 600
@@ -153,12 +149,9 @@ local function jalankanAutoSprinkler()
 
                     local lastTick = lastSprinklerTick[namaDicari] or 0
 
-                    -- Cek apakah sudah waktunya (atau belum pernah dipasang sama sekali)
                     if currentTick - lastTick >= thisDelay or lastTick == 0 then
-                        
                         local sprinklerToUse = nil
                         
-                        -- Cari barangnya
                         for _, item in pairs(backpack:GetChildren()) do
                             local namaAsli = item.Name
                             local namaAtribut = tostring(item:GetAttribute("f") or "")
@@ -178,9 +171,7 @@ local function jalankanAutoSprinkler()
                             end
                         end
 
-                        -- Kalau stoknya ada, pasang!
                         if sprinklerToUse then
-                            -- Hitung koordinat (Raycast) hanya jika belum dihitung di loop ini
                             if not placeCFrame then
                                 local rayParams = RaycastParams.new()
                                 rayParams.FilterDescendantsInstances = {char}
@@ -219,10 +210,9 @@ local function jalankanAutoSprinkler()
                                 end
                             end)
 
-                            -- Catat waktu penanaman untuk jenis ini
                             lastSprinklerTick[namaDicari] = tick()
                             table.insert(dipasangSekarang, namaDicari)
-                            task.wait(0.5) -- Jeda animasi antar sprinkler
+                            task.wait(0.5) 
                         end
                     end
                 end
@@ -236,8 +226,6 @@ local function jalankanAutoSprinkler()
                     })
                 end
             end
-            
-            -- Loop akan mengecek setiap 5 detik (Tidak bikin server berat, dan sangat responsif)
             task.wait(5)
         end
     end)
@@ -250,7 +238,7 @@ TabSprinkler:CreateToggle({
    Callback = function(Value)
       _G.AutoSprinkler = Value
       if Value then 
-          lastSprinklerTick = {} -- Reset timer saat dinyalakan
+          lastSprinklerTick = {} 
           jalankanAutoSprinkler() 
       end
    end,
@@ -433,42 +421,9 @@ TabFruitMerchant:CreateButton({
    end,
 })
 
--- [[ FITUR BARU: AUTO INPUT VIA PENULISAN NAMA (AUTO-SAVE) ]]
-TabFruitMerchant:CreateSection("Auto Input Fruit (Berdasarkan Nama)")
-
-TabFruitMerchant:CreateInput({
-   Name = "Nama Buah Spesifik",
-   PlaceholderText = "Contoh: Bone Blossom",
-   Flag = "Input_AutoFruitName",
-   Callback = function(Text)
-      _G.AutoFruitName = Text
-   end,
-})
-
-TabFruitMerchant:CreateInput({
-   Name = "Harga Jual Otomatis",
-   PlaceholderText = "3",
-   NumbersOnly = true,
-   Flag = "Input_AutoFruitPrice",
-   Callback = function(Text)
-      _G.AutoFruitPrice = tonumber(Text) or 3
-   end,
-})
-
-TabFruitMerchant:CreateInput({
-   Name = "Jeda Otomatis (Detik)",
-   PlaceholderText = "5",
-   NumbersOnly = true,
-   Flag = "Input_AutoFruitDelay",
-   Callback = function(Text)
-      _G.AutoFruitDelay = tonumber(Text) or 5
-   end,
-})
-
 local function jalankanJualFruit()
     task.spawn(function()
         while isSellingFruit do
-            -- 1. Jalankan Antrean Manual (Dari Tombol Tambah Antrean)
             for _, slot in ipairs(antreanFruitSlots) do
                 if not isSellingFruit then break end
                 for _, fruitName in ipairs(slot.Items) do
@@ -488,28 +443,6 @@ local function jalankanJualFruit()
                     end
                 end
             end
-
-            -- 2. Jalankan Antrean Otomatis Berdasarkan Penulisan Nama (Fitur Baru)
-            if _G.AutoFruitName and _G.AutoFruitName ~= "" and isSellingFruit then
-                local bp = player:FindFirstChild("Backpack")
-                if bp then
-                    for _, item in pairs(bp:GetChildren()) do
-                        if not isSellingFruit then break end
-                        
-                        -- Cek apakah nama item mengandung teks yang dicari (Case Insensitive)
-                        if string.find(string.lower(item.Name), string.lower(_G.AutoFruitName)) then
-                            local uuid = item:GetAttribute("c")
-                            if uuid and not item:GetAttribute("PET_UUID") then
-                                pcall(function()
-                                    game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(uuid), tonumber(_G.AutoFruitPrice))
-                                end)
-                                task.wait(_G.AutoFruitDelay)
-                            end
-                        end
-                    end
-                end
-            end
-
             task.wait(2)
         end
     end)
@@ -522,6 +455,40 @@ TabFruitMerchant:CreateToggle({
    Callback = function(Value)
       isSellingFruit = Value
       if Value then jalankanJualFruit() end
+   end,
+})
+
+-- ==========================================
+-- TAB: AUTO MERCHANT (BONE BLOSSOM)
+-- ==========================================
+local TabMerchant = Window:CreateTab("Auto Merchant", 4483362458)
+
+TabMerchant:CreateInput({
+   Name = "Harga Jual Bone Blossom",
+   PlaceholderText = "2",
+   NumbersOnly = true,
+   Flag = "Input_HargaBoneBlossom",
+   Callback = function(Text)
+      _G.HargaJual = tonumber(Text) or 2
+   end
+})
+
+TabMerchant:CreateButton({
+   Name = "PAJANG SEMUA BONE BLOSSOM (Delay 5s)",
+   Callback = function()
+      local backpack = player:FindFirstChild("Backpack")
+      if backpack then
+         for _, item in pairs(backpack:GetChildren()) do
+            local itemName = tostring(item:GetAttribute("f"))
+            local itemID = item:GetAttribute("c")
+            if string.find(itemName, "Bone Blossom") and itemID then
+               pcall(function()
+                  game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(itemID), _G.HargaJual)
+               end)
+               task.wait(5)
+            end
+         end
+      end
    end,
 })
 
