@@ -744,26 +744,6 @@ local antreanCounterFruit = 0
 
 local isSellingFruit = false
 
-local _G.HargaJual = 3
-
-
-TabMerchant:CreateButton({
-   Name = "PAJANG SEMUA BONE BLOSSOM (Delay 5s)",
-   Callback = function()
-      local backpack = player:FindFirstChild("Backpack")
-      if backpack then
-         for _, item in pairs(backpack:GetChildren()) do
-            local itemName = tostring(item:GetAttribute("f"))
-            local itemID = item:GetAttribute("c")
-            if string.find(itemName, "Bone Blossom") and itemID then
-               game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(itemID), _G.HargaJual)
-               task.wait(5)
-            end
-         end
-      end
-   end,
-})
-
 
 
 TabFruitMerchant:CreateButton({
