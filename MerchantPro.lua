@@ -469,26 +469,39 @@ TabFruitMerchant:CreateInput({
    end
 })
 
-TabFruitMerchant:CreateButton({
-   Name = "PAJANG SEMUA BONE BLOSSOM (Delay 5s)",
-   Callback = function()
-      local backpack = player:FindFirstChild("Backpack")
-      if backpack then
-         local count = 0
-         for _, item in pairs(backpack:GetChildren()) do
-            local itemName = tostring(item:GetAttribute("f") or "")
-            local itemID = item:GetAttribute("c")
-            if string.find(itemName, "Bone Blossom") and itemID then
-               count = count + 1
-               pcall(function()
-                  game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(itemID), _G.HargaJual)
-               end)
-               task.wait(5)
+-- Fungsi Loop Auto Bone Blossom Baru
+_G.AutoBoneBlossom = false
+local function jalankanAutoBoneBlossom()
+    task.spawn(function()
+        while _G.AutoBoneBlossom do
+            local backpack = player:FindFirstChild("Backpack")
+            if backpack then
+                for _, item in pairs(backpack:GetChildren()) do
+                    if not _G.AutoBoneBlossom then break end
+                    local itemName = tostring(item:GetAttribute("f") or "")
+                    local itemID = item:GetAttribute("c")
+                    
+                    if string.find(itemName, "Bone Blossom") and itemID then
+                        pcall(function()
+                            game:GetService("ReplicatedStorage").GameEvents.TradeEvents.Booths.CreateListing:InvokeServer("Holdable", tostring(itemID), _G.HargaJual)
+                        end)
+                        task.wait(5) -- Jeda aman antar item agar tidak limit/spam server
+                    end
+                end
             end
-         end
-         if count == 0 then
-            Rayfield:Notify({Title = "Sistem", Content = "Tidak ada Bone Blossom di Inventory!", Duration = 3})
-         end
+            task.wait(2) -- Jeda sirkulasi scanning ulang jika tas kosong/selesai dipajang semua
+        end
+    end)
+end
+
+TabFruitMerchant:CreateToggle({
+   Name = "🚀 MULAI AUTO PAJANG BONE BLOSSOM",
+   CurrentValue = false,
+   Flag = "Toggle_AutoBoneBlossom",
+   Callback = function(Value)
+      _G.AutoBoneBlossom = Value
+      if Value then 
+          jalankanAutoBoneBlossom() 
       end
    end,
 })
